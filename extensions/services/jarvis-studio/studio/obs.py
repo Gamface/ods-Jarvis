@@ -83,3 +83,25 @@ def record(action: str) -> str:
         return f"OBS recording saved: {path}"
     st = request("GetRecordStatus")
     return f"Recording: {st.get('outputActive')} ({st.get('outputTimecode')})"
+
+
+def setup_performance_scene(camera: str = "/dev/video0", mic: bool = True) -> str:
+    """Create (or reuse) a 'Jarvis Performance' scene with a webcam and the default mic.
+    Turns the camera on, so only call this when the user asked for it."""
+    scene = "Jarvis Performance"
+    if scene not in scenes():
+        request("CreateScene", {"sceneName": scene})
+    have = {i["inputName"] for i in request("GetInputList")["inputs"]}
+    made = []
+    if camera and "Jarvis Camera" not in have:
+        request("CreateInput", {"sceneName": scene, "inputName": "Jarvis Camera",
+                                "inputKind": "v4l2_input", "inputSettings": {"device_id": camera},
+                                "sceneItemEnabled": True})
+        made.append(f"camera {camera}")
+    if mic and "Jarvis Mic" not in have:
+        request("CreateInput", {"sceneName": scene, "inputName": "Jarvis Mic",
+                                "inputKind": "pulse_input_capture",
+                                "inputSettings": {"device_id": "default"}, "sceneItemEnabled": True})
+        made.append("microphone")
+    request("SetCurrentProgramScene", {"sceneName": scene})
+    return f"OBS scene '{scene}' ready" + (f" (added {', '.join(made)})" if made else "") + "."

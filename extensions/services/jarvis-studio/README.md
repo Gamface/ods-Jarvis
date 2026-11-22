@@ -1,6 +1,6 @@
 # jarvis-studio
 
-An MCP server and command-line tool. It connects [StemDeck](https://github.com/stemdeckapp/stemdeck), the Ubuntu Studio apps and the local AI models on this computer to Jarvis (ODS Hermes). Everything runs locally. Outputs go to `~/Music/Jarvis/`.
+An MCP server, command-line tool and local dashboard for a music **and video** studio. It connects [StemDeck](https://github.com/stemdeckapp/stemdeck), the Ubuntu Studio apps and the local AI models on this computer to Jarvis (ODS Hermes). Everything runs locally. Audio goes to `~/Music/Jarvis/` and video to `~/Videos/Jarvis/`.
 
 ## The five workflows
 
@@ -16,16 +16,37 @@ Extra tools: `studio_split`, `studio_make_music` (ACE-Step text-to-music), `stud
 
 `song` can be a title or id that's already in StemDeck, an audio file path, or a YouTube or SoundCloud link. A link or file is split first. Only use audio you have the right to use.
 
+## Video studio
+
+Built on ffmpeg (hardware H.264 on the Intel GPU through VAAPI), Inkscape for titles and thumbnails, OBS for recording, Kdenlive (OpenTimelineIO timelines) and Whisper in Lemonade for captions. Videos go to `~/Videos/Jarvis/`.
+
+| # | Workflow | Ask Jarvis something like | Command line |
+|---|---|---|---|
+| V1 | **Music video**: a moving waveform lane per part, a spectrum or one big waveform, plus a title card, synced lyrics and a thumbnail | "Make a vertical spectrum video of the chorus of *song*" | `jarvis-studio music-video "song" --style spectrum --aspect 9:16 --section chorus` |
+| V2 | **Performance video**: OBS records while the backing plays. Jarvis finds where the backing starts in the take, mixes in the studio track and adds lyrics | "Record a karaoke take of *song*" … "finish the performance" | `jarvis-studio perform-start "song"` then `perform-finish`, or `performance take.mp4 "song"` |
+| V3 | **Beat-cut edit**: a folder of clips and photos cut every 2, 4 or 8 beats, plus an `.otio` timeline for Kdenlive | "Cut my trip videos to *song*, fast, 30 seconds" | `jarvis-studio edit ~/Videos/trip "song" --pace fast --max 30` |
+| V4 | **Shorts**: 9:16, 1:1 and 16:9 clips of the chorus or loudest part, with captions, -14 LUFS audio and thumbnails. Never posts | "Make a 30 second Short and a square clip from this video" | `jarvis-studio shorts video.mp4 --platforms shorts,square --seconds 30` |
+| V5 | **Narrated video**: MOSS-TTS reads your script, one slide or photo per paragraph, captions from the script, music ducked under the voice | "Make a video explaining how this song was made" | `jarvis-studio narrate script.txt "Title" --music "song"` |
+| + | **Captions**: Whisper subtitles (`.srt`) for any video, optionally burned in | "Caption this video" | `jarvis-studio captions talk.mp4 --style pop` |
+
+Hermes tools: `video_music_video`, `video_perform_start`, `video_perform_finish`, `video_performance`, `video_obs_scene`, `video_auto_edit`, `video_shorts`, `video_narrated` and `video_captions`. The dashboard has the same forms under **Video studio**.
+
+Timings on this computer: a 45 s music video about 18 s, a 30 s beat-cut edit with 20 cuts about 8 s, a 3-paragraph narrated video about 35 s, a 10 s caption job about 10 s.
+
+**Camera:** OBS starts with an empty scene. Run `jarvis-studio obs-scene` (or **Set up camera scene** in the dashboard) once to add a "Jarvis Performance" scene with `/dev/video0` and the default microphone. It turns the camera on.
+
+**Whisper:** Lemonade's Vulkan build of whisper.cpp crashes on this machine, so jarvis-studio loads `Whisper-Small` with the CPU backend (`JARVIS_WHISPER_BACKEND=cpu`).
+
 ## Dashboard
 
 Open **http://127.0.0.1:7722**, or **Jarvis Studio** in the app menu. It runs as the `jarvis-studio-dashboard` user service and only answers on this computer.
 
 - **Status bar**: StemDeck, the Hermes MCP server, the Hermes container, Lemonade, Guitarix, OBS, Audacity, Ardour, playback, AI models and free disk space.
 - **Library**: every song in StemDeck with key, BPM and length. Pick one to see how present each part is. **Add a song** splits a file or link.
-- **Workflow tabs**: forms for the five workflows plus **Create** (ACE-Step music, MOSS-TTS speech). Click a part to mute it, again to solo it.
+- **Music studio / Video studio** switch: forms for the five music workflows plus **Create** (ACE-Step music, MOSS-TTS speech), and the five video workflows plus **Captions**. Click a part to mute it, again to solo it.
 - **Rigs**: open Guitarix and switch presets; open OBS, change scene, start or stop recording (asks first).
 - **Jobs**: workflows run in the background (two at a time) with results and file buttons.
-- **Outputs**: recent files in `~/Music/Jarvis`. Preview in the browser, play on the computer speakers, open PDFs and videos, or show in the folder.
+- **Outputs**: recent files in `~/Music/Jarvis` and `~/Videos/Jarvis`. Preview audio, watch videos in a pop-up player, play on the computer speakers, open PDFs, thumbnails and timelines, or show in the folder.
 - **Activity**: the shared audit log, so you see what Hermes did as well as the dashboard.
 
 Requests must come from `localhost`, and every action needs a JSON body with an `X-Jarvis` header, so other websites can't drive it from your browser.
@@ -67,6 +88,8 @@ Add the entry the script prints to `~/ods/data/hermes/config.yaml` under `mcp_se
 
 ## Known limits
 
+- **Kdenlive** opens beat-cut edits through **File > Import > OpenTimelineIO**. The `.otio` files are checked with the OpenTimelineIO library, but the Kdenlive import itself hasn't been tried yet.
+- **AI video generation** isn't practical here: there's no NVIDIA GPU. The video tools edit, compose and caption your own footage and the studio's audio.
 - **Ardour** can't import audio without its window open. `daw` creates the session with the stems inside it and installs a Lua action. In Ardour, run **Edit > Lua Scripts > Script Manager > "Jarvis: Import StemDeck stems"** once; assign it to an action button so later imports take one click.
 - **OBS** won't record until its first-run Auto-Configuration Wizard has been finished or cancelled once. Add a camera or screen source to a scene for Performance videos.
 - **Sheet music** is an automatic transcription, so treat it as a draft. MuseScore 3 puts each part on a piano grand staff. MuseScore 4 engraves better.

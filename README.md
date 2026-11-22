@@ -15,7 +15,7 @@ Jarvis is a set of extensions for [ODS](https://github.com/Osmantic/ODS) that le
   - `press_keys`
   - `ask_approval`
 
-- `extensions/services/jarvis-studio/` is a music studio for Hermes. It connects StemDeck, Audacity, Ardour, Guitarix, OBS, ACE-Step, MOSS-TTS-Nano and basic-pitch with MuseScore through five workflows: practice, DAW sessions, karaoke, AI re-production and sheet music. It has a local dashboard at http://127.0.0.1:7722. See its [README](extensions/services/jarvis-studio/README.md).
+- `extensions/services/jarvis-studio/` is a music studio for Hermes. It connects StemDeck, Audacity, Ardour, Guitarix, OBS, ACE-Step, MOSS-TTS-Nano and basic-pitch with MuseScore through five music workflows (practice, DAW sessions, karaoke, AI re-production, sheet music) and five video workflows (music videos, performance videos, beat-cut edits, shorts, narrated videos) plus captions. It has a local dashboard at http://127.0.0.1:7722. See its [README](extensions/services/jarvis-studio/README.md).
 
 ## Safety model
 

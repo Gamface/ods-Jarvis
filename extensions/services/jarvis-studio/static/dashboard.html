@@ -113,7 +113,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 @media (max-width: 520px) { .presence { grid-template-columns: repeat(3, 1fr); } }
 
 /* tabs */
-.tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .tab { border: 0; background: none; padding: 11px 12px; cursor: pointer; color: var(--ink-2); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
 .tab .num { font-family: var(--mono); font-size: 11px; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; background: var(--panel-2); color: var(--ink-3); }
 .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
@@ -194,6 +194,20 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .player audio { flex: 1; height: 36px; min-width: 0; }
 @media (max-width: 600px) { .player .now { display: none; } .player-in { padding: 8px 16px; } }
 
+.mode { display: inline-flex; padding: 3px; gap: 2px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+.mode button { border: 0; background: none; padding: 7px 16px; border-radius: 7px; cursor: pointer; font-weight: 650; color: var(--ink-2); display: inline-flex; align-items: center; gap: 7px; }
+.mode button.on { background: var(--panel); color: var(--ink); box-shadow: var(--shadow), 0 0 0 1px var(--line); }
+.mode-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; border-right: 1px solid var(--line); background: var(--panel); padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink-2); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.subhead { font-size: 13px; font-weight: 700; margin: 4px 0 10px; color: var(--ink); }
+.divider { border: 0; border-top: 1px dashed var(--line-strong); margin: 20px 0 16px; }
+dialog.viewer { border: 0; padding: 0; border-radius: 12px; background: #000; max-width: min(1100px, 94vw); width: fit-content; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+dialog.viewer::backdrop { background: rgba(10,8,6,.72); }
+dialog.viewer video { display: block; max-width: min(1100px, 94vw); max-height: 80vh; }
+dialog.viewer .vbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; background: var(--panel); color: var(--ink); font-size: 13px; }
 .toast { position: fixed; right: 20px; bottom: 80px; z-index: 30; display: grid; gap: 8px; max-width: min(380px, calc(100vw - 32px)); }
 .toast div { background: var(--ink); color: var(--bg); padding: 9px 13px; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2); white-space: pre-wrap; }
 .toast div.err { background: var(--bad); color: #fff; }
@@ -266,7 +280,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
       <div class="song-head" id="songHead"><div class="empty">Pick a song from the library, or add one.</div></div>
     </section>
 
-    <section class="panel">
+    <div class="mode-row">
+      <div class="mode" role="tablist" aria-label="Studio">
+        <button class="on" data-mode="music" role="tab">♪ Music studio</button>
+        <button data-mode="video" role="tab">▶ Video studio</button>
+      </div>
+      <span class="hint" id="modeHint">Songs from the library feed both studios.</span>
+    </div>
+
+    <section class="panel" id="musicPanel">
       <nav class="tabs" role="tablist">
         <button class="tab on" data-tab="practice" role="tab"><span class="num">1</span>Practice</button>
         <button class="tab" data-tab="daw" role="tab"><span class="num">2</span>DAW</button>
@@ -378,6 +400,140 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
         <div class="actions"><button class="btn primary" data-run="speak">Speak</button></div>
       </div>
     </section>
+
+    <section class="panel" id="videoPanel" hidden>
+      <nav class="tabs" role="tablist">
+        <button class="tab on" data-tab="v1" role="tab"><span class="num">1</span>Music video</button>
+        <button class="tab" data-tab="v2" role="tab"><span class="num">2</span>Performance</button>
+        <button class="tab" data-tab="v3" role="tab"><span class="num">3</span>Beat-cut edit</button>
+        <button class="tab" data-tab="v4" role="tab"><span class="num">4</span>Shorts</button>
+        <button class="tab" data-tab="v5" role="tab"><span class="num">5</span>Narrated</button>
+        <button class="tab" data-tab="vc" role="tab"><span class="num">+</span>Captions</button>
+      </nav>
+
+      <div class="pane on" id="pane-v1">
+        <p class="pane-intro">A video for the selected song: moving waveforms for each part, a spectrum or one big waveform, with a title card and synced lyrics when StemDeck has them.</p>
+        <div class="row">
+          <div class="field"><label class="f">Look</label><div class="seg" id="mvStyle" data-value="stems">
+            <button data-v="stems" class="on">Stem lanes</button><button data-v="spectrum">Spectrum</button><button data-v="waves">Waveform</button></div></div>
+          <div class="field"><label class="f">Shape</label><div class="seg aspect" id="mvAspect" data-value="16:9">
+            <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="f" for="mvSection">Part of the song</label><select id="mvSection" class="secsel"></select></div>
+          <div class="field"><label class="f" for="mvAudio">Soundtrack</label>
+            <input type="text" id="mvAudio" list="audioList" placeholder="The song itself (or pick a production master)"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="f" for="mvTitle">Title</label><input type="text" id="mvTitle" placeholder="Song title"></div>
+          <div class="field"><label class="f" for="mvSub">Subtitle</label><input type="text" id="mvSub" placeholder="Artist or tagline"></div>
+        </div>
+        <div class="field"><label class="f" for="mvBg">Background image (optional)</label>
+          <input type="text" id="mvBg" placeholder="~/Pictures/cover.jpg — blank for a moving gradient"></div>
+        <div class="field"><label class="check"><input type="checkbox" id="mvLyrics" checked> Show synced lyrics</label></div>
+        <div class="actions"><button class="btn primary" data-run="v_music_video">Make music video</button><span class="hint">About 20 s per 45 s of song.</span></div>
+      </div>
+
+      <div class="pane" id="pane-v2">
+        <p class="pane-intro">Film yourself playing or singing along. OBS records, the backing plays on the speakers, then Jarvis lines the take up with the studio track, mixes it and adds lyrics.</p>
+        <div class="subhead">Record a take of the selected song</div>
+        <div class="row">
+          <div class="field"><label class="f" for="pfMode">Backing</label>
+            <select id="pfMode"><option value="karaoke">Karaoke (no lead vocal)</option><option value="full">Whole song</option>
+              <option value="no-guitar">Without guitar</option><option value="no-bass">Without bass</option>
+              <option value="no-drums">Without drums</option><option value="no-piano">Without piano</option></select></div>
+          <div class="field"><label class="f" for="pfKey">Key change <span class="val" id="pfKeyV">0 st</span></label>
+            <input type="range" id="pfKey" min="-6" max="6" step="1" value="0"></div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-run="v_perform_start">● Start take</button>
+          <button class="btn" data-run="v_perform_finish">■ Finish take</button>
+          <button class="btn ghost" data-run="v_obs_scene" title="Creates an OBS scene with your webcam and microphone">Set up camera scene</button>
+        </div>
+        <p class="hint" style="margin:10px 0 0">The camera scene is needed once. Starting a take turns on recording, and the camera if the scene has one.</p>
+        <hr class="divider">
+        <div class="subhead">Or use a recording you already have</div>
+        <div class="field"><label class="f" for="pfFile">Video of you with the song playing</label>
+          <input type="text" id="pfFile" placeholder="~/Videos/my-take.mp4"></div>
+        <div class="field"><label class="check"><input type="checkbox" id="pfLyrics" checked> Add lyrics</label></div>
+        <div class="actions"><button class="btn primary" data-run="v_performance">Make performance video</button></div>
+      </div>
+
+      <div class="pane" id="pane-v3">
+        <p class="pane-intro">Cut a folder of clips and photos to the beat of the selected song. You get a finished video and an OpenTimelineIO timeline to fine-tune in Kdenlive (File › Import › OpenTimelineIO).</p>
+        <div class="field"><label class="f" for="edClips">Clips and photos</label>
+          <input type="text" id="edClips" placeholder="~/Videos/trip  (a folder, or files separated by commas)"></div>
+        <div class="row">
+          <div class="field"><label class="f">Pace</label><div class="seg" id="edPace" data-value="medium">
+            <button data-v="slow">Slow · 8 beats</button><button data-v="medium" class="on">Medium · 4</button><button data-v="fast">Fast · 2</button></div></div>
+          <div class="field"><label class="f">Shape</label><div class="seg aspect" id="edAspect" data-value="16:9">
+            <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="f" for="edSection">Part of the song</label><select id="edSection" class="secsel"></select></div>
+          <div class="field"><label class="f" for="edMax">Longest length (seconds)</label><input type="number" id="edMax" min="5" step="5" placeholder="whole song"></div>
+          <div class="field"><label class="f" for="edTitle">Title</label><input type="text" id="edTitle" placeholder="Song title"></div>
+        </div>
+        <div class="field"><label class="check"><input type="checkbox" id="edLyrics"> Show synced lyrics</label></div>
+        <div class="actions"><button class="btn primary" data-run="v_auto_edit">Cut to the beat</button><span class="hint">Seconds to a minute.</span></div>
+      </div>
+
+      <div class="pane" id="pane-v4">
+        <p class="pane-intro">Short clips for social media, with captions, loud-and-clear audio (−14 LUFS) and a thumbnail. Jarvis never posts anything.</p>
+        <div class="field"><label class="f">Make it from</label><div class="seg" id="shSource" data-value="song">
+          <button data-v="song" class="on">The selected song</button><button data-v="file">A video file</button></div></div>
+        <div class="field" id="shFileWrap" hidden><label class="f" for="shFile">Video file</label>
+          <input type="text" id="shFile" list="videoList" placeholder="~/Videos/clip.mp4 or pick a recent output"></div>
+        <div class="field"><label class="f">Platforms</label>
+          <label class="check"><input type="checkbox" name="plat" value="shorts" checked> YouTube Shorts</label>
+          <label class="check"><input type="checkbox" name="plat" value="reels"> Reels</label>
+          <label class="check"><input type="checkbox" name="plat" value="tiktok"> TikTok</label>
+          <label class="check"><input type="checkbox" name="plat" value="square" checked> Square</label>
+          <label class="check"><input type="checkbox" name="plat" value="youtube"> YouTube 16:9</label></div>
+        <div class="row">
+          <div class="field"><label class="f">Length</label><div class="seg" id="shLen" data-value="30">
+            <button data-v="15">15 s</button><button data-v="30" class="on">30 s</button><button data-v="60">60 s</button></div></div>
+          <div class="field"><label class="f" for="shStart">Start at (seconds)</label><input type="number" id="shStart" min="0" step="0.5" placeholder="auto: chorus or loudest part"></div>
+          <div class="field"><label class="f" for="shCap">Captions</label>
+            <select id="shCap"><option value="auto">Automatic</option><option value="lyrics">Song lyrics</option><option value="speech">Speech (Whisper)</option><option value="none">None</option></select></div>
+        </div>
+        <div class="field"><label class="f" for="shTitle">Thumbnail title</label><input type="text" id="shTitle" placeholder="Defaults to the song or file name"></div>
+        <div class="actions"><button class="btn primary" data-run="v_shorts">Make shorts</button></div>
+      </div>
+
+      <div class="pane" id="pane-v5">
+        <p class="pane-intro">Type a script and Jarvis reads it with MOSS-TTS, puts one slide or photo on screen per paragraph, captions it and adds a music bed that ducks under the voice.</p>
+        <div class="field"><label class="f" for="nrTitle">Title</label><input type="text" id="nrTitle" placeholder="How this song was made"></div>
+        <div class="field"><label class="f" for="nrScript">Script (blank line between paragraphs)</label>
+          <textarea id="nrScript" style="min-height:140px" placeholder="First paragraph…&#10;&#10;Second paragraph…"></textarea></div>
+        <div class="row">
+          <div class="field"><label class="f" for="nrImages">Photos or clips (optional)</label><input type="text" id="nrImages" placeholder="~/Pictures/session — blank for text slides"></div>
+          <div class="field"><label class="f" for="nrMusic">Music bed</label>
+            <select id="nrMusic"><option value="">None</option><option value="__song" selected>Selected song (no vocals)</option><option value="__file">An audio file…</option></select></div>
+        </div>
+        <div class="row">
+          <div class="field" id="nrMusicFileWrap" hidden><label class="f" for="nrMusicFile">Audio file</label><input type="text" id="nrMusicFile" list="audioList" placeholder="~/Music/bed.wav"></div>
+          <div class="field"><label class="f" for="nrVoice">Voice to clone (optional WAV)</label><input type="text" id="nrVoice" placeholder="default voice"></div>
+          <div class="field"><label class="f">Shape</label><div class="seg aspect" id="nrAspect" data-value="16:9">
+            <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
+        </div>
+        <div class="actions"><button class="btn primary" data-run="v_narrated">Make narrated video</button><span class="hint">About 10 s per paragraph.</span></div>
+      </div>
+
+      <div class="pane" id="pane-vc">
+        <p class="pane-intro">Subtitles for any video with Whisper, running locally in Lemonade. You always get an .srt file; tick the box for a copy with captions in the picture.</p>
+        <div class="field"><label class="f" for="caFile">Video</label><input type="text" id="caFile" list="videoList" placeholder="~/Videos/talk.mp4"></div>
+        <div class="row">
+          <div class="field"><label class="f">Style</label><div class="seg" id="caStyle" data-value="bottom">
+            <button data-v="bottom" class="on">Subtitles</button><button data-v="pop">Big pop words</button></div></div>
+          <div class="field"><label class="f" for="caLang">Language</label><input type="text" id="caLang" placeholder="auto-detect (or en, es, fr…)"></div>
+        </div>
+        <div class="field"><label class="check"><input type="checkbox" id="caBurn" checked> Make a copy with captions burned in</label></div>
+        <div class="actions"><button class="btn primary" data-run="v_captions">Make captions</button></div>
+      </div>
+    </section>
+    <datalist id="videoList"></datalist>
+    <datalist id="audioList"></datalist>
   </div>
 
   <!-- RIGHT -->
@@ -387,7 +543,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
       <div class="panel-b"><div class="jobs" id="jobs"><div class="empty">Nothing yet. Jobs you start here appear with their results.</div></div></div>
     </section>
     <section class="panel">
-      <div class="panel-h"><h2>Outputs</h2><button class="btn sm ghost" id="openRoot" title="Open ~/Music/Jarvis">Open folder</button></div>
+      <div class="panel-h"><h2>Outputs</h2><button class="btn sm ghost" id="openRoot" title="Open the output folder">Open folder</button></div>
       <div class="filter" id="outFilter"></div>
       <div class="panel-b scroll"><div class="files" id="outputs"></div></div>
     </section>
@@ -403,6 +559,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   <audio id="audio" controls preload="none"></audio>
 </div></footer>
 <div class="toast" id="toast" aria-live="polite"></div>
+<dialog class="viewer" id="viewer"><video id="vplayer" controls playsinline></video>
+  <div class="vbar"><span id="vname"></span><button class="btn sm" id="vclose">Close</button></div></dialog>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -528,6 +686,10 @@ function renderSong() {
     el("option", { value: "__custom", text: "Custom start / end…" }));
   if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
   $("#prCustom").hidden = sel.value !== "__custom";
+  $$(".secsel").forEach(x => { const c = x.value;
+    x.replaceChildren(...[...sel.options].filter(o => o.value !== "__custom").map(o => o.cloneNode(true)));
+    if ([...x.options].some(o => o.value === c)) x.value = c; });
+  for (const id of ["#mvTitle", "#edTitle"]) $(id).placeholder = s.title || "Song title";
   $("#poEta").textContent = s.duration ? `About ${Math.ceil(s.duration * 4.5 / 60)} min for this ${fmtTime(s.duration)} song on CPU.` : "About 4–5× the song length on CPU.";
 }
 function buildStemToggles(sel, stems, initial) {
@@ -554,13 +716,33 @@ bindVal("#mmDur", "#mmDurV", v => v + " s");
 $("#prSection").onchange = e => $("#prCustom").hidden = e.target.value !== "__custom";
 $("#poPresets").replaceChildren(...STYLES.map(s => el("button", { class: "btn sm", type: "button", text: s.split(",")[0], title: s, onclick: () => $("#poStyle").value = s })));
 
-/* tabs */
+/* tabs (each panel has its own) */
 $$(".tab").forEach(t => t.onclick = () => {
-  $$(".tab").forEach(x => x.classList.toggle("on", x === t));
-  $$(".pane").forEach(p => p.classList.toggle("on", p.id === "pane-" + t.dataset.tab));
-  try { localStorage.setItem("jarvis-tab", t.dataset.tab); } catch {}
+  const panel = t.closest("section");
+  panel.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  panel.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === "pane-" + t.dataset.tab));
+  try { localStorage.setItem("jarvis-tab-" + panel.id, t.dataset.tab); } catch {}
 });
-try { const t = localStorage.getItem("jarvis-tab"); if (t) $(`.tab[data-tab="${t}"]`)?.click(); } catch {}
+for (const id of ["musicPanel", "videoPanel"]) {
+  try { const t = localStorage.getItem("jarvis-tab-" + id); if (t) $(`#${id} .tab[data-tab="${t}"]`)?.click(); } catch {}
+}
+/* music / video mode */
+function setMode(m) {
+  $$(".mode button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("#musicPanel").hidden = m !== "music"; $("#videoPanel").hidden = m !== "video";
+  try { localStorage.setItem("jarvis-mode", m); } catch {}
+}
+$$(".mode button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+try { setMode(localStorage.getItem("jarvis-mode") || "music"); } catch { setMode("music"); }
+/* segmented controls */
+$$(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick = () => {
+  seg.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  seg.dataset.value = b.dataset.v; seg.dispatchEvent(new Event("change"));
+}));
+const segVal = sel => $(sel).dataset.value;
+$("#shSource").addEventListener("change", () => $("#shFileWrap").hidden = segVal("#shSource") !== "file");
+$("#nrMusic").onchange = e => $("#nrMusicFileWrap").hidden = e.target.value !== "__file";
+bindVal("#pfKey", "#pfKeyV", v => (v > 0 ? "+" : "") + v + " st");
 
 /* run workflows */
 function needSong() { if (!state.song) { toast("Pick a song first.", true); return null; } return state.song.title || state.song.job_id; }
@@ -589,6 +771,48 @@ const BUILDERS = {
   },
   sheet() { if (!needSong()) return; return { song: state.song.job_id, parts: stemsIn("#shParts", "on") }; },
   make_music() { const c = $("#mmCaption").value.trim(); if (!c) { toast("Describe the music first.", true); return; } return { caption: c, lyrics: $("#mmLyrics").value.trim(), duration: +$("#mmDur").value }; },
+  v_music_video() {
+    if (!needSong()) return;
+    return { song: state.song.job_id, style: segVal("#mvStyle"), aspect: segVal("#mvAspect"), section: $("#mvSection").value,
+      audio: $("#mvAudio").value.trim(), title: $("#mvTitle").value.trim(), subtitle: $("#mvSub").value.trim(),
+      background: $("#mvBg").value.trim(), lyrics: $("#mvLyrics").checked };
+  },
+  v_perform_start() {
+    if (!needSong()) return;
+    if (!confirm("Start recording in OBS and play the backing? This records your camera/screen if the scene has them.")) return;
+    return { song: state.song.job_id, mode: $("#pfMode").value, semitones: +$("#pfKey").value };
+  },
+  v_perform_finish() { return { lyrics: $("#pfLyrics").checked }; },
+  v_obs_scene() { if (!confirm("Create an OBS scene with your webcam and microphone? This turns the camera on.")) return; return {}; },
+  v_performance() {
+    if (!needSong()) return; const f = $("#pfFile").value.trim(); if (!f) { toast("Enter the recording's path.", true); return; }
+    return { recording: f, song: state.song.job_id, lyrics: $("#pfLyrics").checked };
+  },
+  v_auto_edit() {
+    if (!needSong()) return; const c = $("#edClips").value.trim(); if (!c) { toast("Enter a folder of clips or photos.", true); return; }
+    return { clips: c, song: state.song.job_id, pace: segVal("#edPace"), aspect: segVal("#edAspect"), section: $("#edSection").value,
+      max_len: $("#edMax").value, title: $("#edTitle").value.trim(), lyrics: $("#edLyrics").checked };
+  },
+  v_shorts() {
+    const plats = $$("input[name=plat]:checked").map(x => x.value); if (!plats.length) { toast("Pick at least one platform.", true); return; }
+    const fromFile = segVal("#shSource") === "file";
+    let source;
+    if (fromFile) { source = $("#shFile").value.trim(); if (!source) { toast("Enter a video file.", true); return; } }
+    else { if (!needSong()) return; source = state.song.job_id; }
+    return { source, platforms: plats, seconds: +segVal("#shLen"), start: $("#shStart").value, caption: $("#shCap").value,
+      title: $("#shTitle").value.trim(), song: fromFile && $("#shCap").value === "lyrics" && state.song ? state.song.job_id : "" };
+  },
+  v_narrated() {
+    const title = $("#nrTitle").value.trim(), script = $("#nrScript").value.trim();
+    if (!title || !script) { toast("Give the video a title and a script.", true); return; }
+    const m = $("#nrMusic").value; let music = "";
+    if (m === "__song") { if (!needSong()) return; music = state.song.job_id; } else if (m === "__file") music = $("#nrMusicFile").value.trim();
+    return { title, script, images: $("#nrImages").value.trim(), voice: $("#nrVoice").value.trim(), music, aspect: segVal("#nrAspect") };
+  },
+  v_captions() {
+    const f = $("#caFile").value.trim(); if (!f) { toast("Enter a video file.", true); return; }
+    return { video: f, style: segVal("#caStyle"), burn: $("#caBurn").checked, language: $("#caLang").value.trim() };
+  },
   speak() { const t = $("#spText").value.trim(); if (!t) { toast("Type something to say.", true); return; } return { text: t, voice: $("#spVoice").value.trim(), play: $("#spPlay").checked }; },
 };
 async function run(workflow, args) {
@@ -619,7 +843,7 @@ async function loadJobs() {
 function renderJob(j) {
   const now = Date.now() / 1000;
   const el_ = (j.finished || now) - (j.started || j.created);
-  const subj = j.args.song ? (state.songs.find(s => s.job_id === j.args.song)?.title || j.args.song) : (j.args.caption || j.args.text || j.args.source || "");
+  const subj = j.args.song ? (state.songs.find(s => s.job_id === j.args.song)?.title || j.args.song) : (j.args.title || j.args.caption || j.args.text || j.args.source || j.args.video || j.args.recording || "");
   const card = el("div", { class: "job" },
     el("div", { class: "job-h" }, el("b", { text: j.label }), el("span", { class: "pill " + j.status, text: j.status })),
     el("div", { class: "sub", text: `${subj} · ${fmtTime(el_)}${j.args.style ? " · " + j.args.style : ""}` }));
@@ -633,10 +857,11 @@ function renderJob(j) {
 function fileRow(f) {
   const audioExt = [".wav", ".mp3", ".flac"].includes(f.ext);
   const acts = [];
-  if (audioExt || f.ext === ".mp4") acts.push(iconBtn("play", "Preview in browser", () => preview(f)));
+  if (audioExt) acts.push(iconBtn("play", "Preview in browser", () => preview(f)));
+  if (f.ext === ".mp4") acts.push(iconBtn("play", "Watch", () => watch(f)));
   if (audioExt) acts.push(iconBtn("speaker", "Play on computer speakers", () => api("/api/play", { path: f.path }).then(r => toast(r.message)).catch(e => toast(e.message, true))));
-  if ([".pdf", ".mp4", ".lrc", ".txt"].includes(f.ext)) acts.push(iconBtn("open", "Open in new tab", () => window.open("/files/" + encodeURI(f.path), "_blank", "noopener")));
-  if ([".aup3", ".ardour", ".mid"].includes(f.ext)) acts.push(iconBtn("open", "Open in its app", () => api("/api/open", { path: f.path, file: true }).then(r => toast(r.message)).catch(e => toast(e.message, true))));
+  if ([".pdf", ".mp4", ".lrc", ".txt", ".png", ".srt"].includes(f.ext)) acts.push(iconBtn("open", "Open in new tab", () => window.open("/files/" + encodeURI(f.path), "_blank", "noopener")));
+  if ([".aup3", ".ardour", ".mid", ".otio"].includes(f.ext)) acts.push(iconBtn("open", "Open in its app", () => api("/api/open", { path: f.path, file: true }).then(r => toast(r.message)).catch(e => toast(e.message, true))));
   acts.push(iconBtn("folder", "Show in folder", () => api("/api/open", { path: f.path }).then(r => toast(r.message)).catch(e => toast(e.message, true))));
   return el("div", { class: "file" },
     el("div", { class: "ico " + f.ext.slice(1), text: f.ext.slice(1, 4) }),
@@ -644,32 +869,49 @@ function fileRow(f) {
       el("div", { class: "ds", text: [f.song || f.kind, fmtSize(f.size), ago(f.mtime)].filter(Boolean).join(" · ") })),
     el("div", { class: "acts" }, ...acts));
 }
+function watch(f) {
+  $("#audio").pause();
+  const v = $("#vplayer"); v.src = "/files/" + encodeURI(f.path); $("#vname").textContent = f.name;
+  $("#viewer").showModal(); v.play().catch(() => {});
+}
+$("#vclose").onclick = () => $("#viewer").close();
+$("#viewer").addEventListener("close", () => $("#vplayer").pause());
+$("#viewer").addEventListener("click", e => { if (e.target.id === "viewer") $("#viewer").close(); });
 function preview(f) {
   const a = $("#audio");
   a.src = "/files/" + encodeURI(f.path); a.play().catch(() => {});
   $("#nowName").textContent = f.name; $("#nowSub").textContent = f.song || f.kind || "";
 }
-const KINDS = { all: "All", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech" };
+const KINDS = { all: "All", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech",
+  "music-videos": "Music videos", performances: "Performances", edits: "Edits", shorts: "Shorts", narrated: "Narrated", captions: "Captions" };
+const VIDEO_KINDS = new Set(["music-videos", "performances", "edits", "shorts", "narrated", "captions"]);
 async function loadOutputs() {
   try { state.outputs = await api("/api/outputs"); } catch { return; }
   const present = new Set(state.outputs.map(f => f.kind));
   $("#outFilter").replaceChildren(...Object.entries(KINDS).filter(([k]) => k === "all" || present.has(k)).map(([k, v]) =>
     el("button", { class: state.outFilter === k ? "on" : "", text: v, onclick: () => { state.outFilter = k; loadOutputs(); } })));
   const list = state.outputs.filter(f => state.outFilter === "all" || f.kind === state.outFilter);
+  const opt = f => el("option", { value: f.abs, label: `${f.name} · ${f.song || f.kind}` });
+  $("#videoList").replaceChildren(...state.outputs.filter(f => f.ext === ".mp4").slice(0, 30).map(opt));
+  $("#audioList").replaceChildren(...state.outputs.filter(f => [".wav", ".mp3", ".flac"].includes(f.ext)).slice(0, 30).map(opt));
   $("#outputs").replaceChildren(...(list.length ? list.slice(0, 50).map(fileRow) : [el("div", { class: "empty", text: "No files yet." })]));
 }
-$("#openRoot").onclick = () => api("/api/open", { path: "." }).then(r => toast(r.message)).catch(e => toast(e.message, true));
+$("#openRoot").onclick = () => api("/api/open", { path: VIDEO_KINDS.has(state.outFilter) || (state.outFilter === "all" && !$("#videoPanel").hidden) ? "video/" : "music/" }).then(r => toast(r.message)).catch(e => toast(e.message, true));
 
 /* activity */
 const EVENT_NAMES = { library: "Listed library", split: "Split a song", practice: "Practice track", stop: "Stopped audio", to_daw: "Stems to DAW", daw: "Stems to DAW",
   karaoke: "Karaoke", obs: "OBS", guitarix: "Guitarix", ai_produce: "AI re-production", produce: "AI re-production", make_music: "Make music",
-  speak: "Speak", sheet_music: "Sheet music", sheet: "Sheet music", play: "Played a file" };
+  speak: "Speak", sheet_music: "Sheet music", sheet: "Sheet music", play: "Played a file",
+  v_music_video: "Music video", video_music_video: "Music video", v_perform_start: "Started a take", video_perform_start: "Started a take",
+  v_perform_finish: "Finished a take", video_perform_finish: "Finished a take", v_performance: "Performance video", video_performance: "Performance video",
+  v_obs_scene: "OBS camera scene", video_obs_scene: "OBS camera scene", v_auto_edit: "Beat-cut edit", video_auto_edit: "Beat-cut edit",
+  v_shorts: "Shorts", video_shorts: "Shorts", v_narrated: "Narrated video", video_narrated: "Narrated video", v_captions: "Captions", video_captions: "Captions" };
 async function loadActivity() {
   let recs; try { recs = await api("/api/activity"); } catch { return; }
   $("#activity").replaceChildren(...(recs.length ? recs.map(r => {
     const base = r.event.replace(/_(done|error)$/, ""); const err = r.event.endsWith("_error"); const done = r.event.endsWith("_done");
     const name = (EVENT_NAMES[base] || base) + (err ? " failed" : done ? " finished" : "");
-    const a = r.args || {}; const detail = err ? r.error : (a.song ? (state.songs.find(s => s.job_id === a.song)?.title || a.song) : a.preset || a.action || a.caption || a.source || a.path || "");
+    const a = r.args || {}; const detail = err ? r.error : (a.song ? (state.songs.find(s => s.job_id === a.song)?.title || a.song) : a.title || a.preset || a.action || a.caption || a.source || a.video || a.recording || a.path || "");
     return el("div", { class: "act" + (err ? " err" : "") }, el("time", { text: (r.ts || "").slice(11, 16), title: r.ts }),
       el("div", {}, el("span", { class: "via " + r.via, text: r.via }), el("span", { class: "ev", text: name }),
         detail ? el("div", { class: "hint", text: String(detail).slice(0, 140) }) : null));

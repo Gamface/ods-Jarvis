@@ -33,6 +33,8 @@ from starlette.routing import Route
 from studio import audio, guitarix, obs
 from studio import stemdeck as sd
 from studio import workflows as wf
+from studio.video import workflows as vwf
+from studio.video.common import VIDEO_OUT, vaapi_ok
 from studio.config import (ACESTEP_DIR, BASIC_PITCH, MOSS_DIR, OUT_ROOT, STEMDECK_URL,
                            out_dir)
 
@@ -115,15 +117,42 @@ WORKFLOWS = {
     "sheet": ("Sheet music", lambda a: wf.sheet_music(a["song"], _csv(a.get("parts")))),
     "make_music": ("Make music", _make_music),
     "speak": ("Speak", _speak),
+    # Video studio
+    "v_music_video": ("Music video", lambda a: vwf.music_video(
+        a["song"], a.get("style") or "stems", a.get("aspect") or "16:9", a.get("title") or None,
+        a.get("subtitle") or None, a.get("background") or None, bool(a.get("lyrics", True)),
+        a.get("section") or None, None, None, a.get("audio") or None)),
+    "v_perform_start": ("Performance take", lambda a: vwf.perform_start(
+        a["song"], a.get("mode") or "karaoke", _num(a.get("semitones"), int, 0), a.get("scene") or None)),
+    "v_perform_finish": ("Finish performance", lambda a: vwf.perform_finish(bool(a.get("lyrics", True)))),
+    "v_performance": ("Performance video", lambda a: vwf.performance(
+        a["recording"], a["song"], None, bool(a.get("lyrics", True)))),
+    "v_obs_scene": ("OBS camera scene", lambda a: obs.start() + "\n" + obs.setup_performance_scene(
+        a.get("camera") or "/dev/video0", bool(a.get("mic", True)))),
+    "v_auto_edit": ("Beat-cut edit", lambda a: vwf.auto_edit(
+        a["clips"], a["song"], a.get("aspect") or "16:9", a.get("pace") or "medium",
+        a.get("title") or None, a.get("section") or None, None, _num(a.get("max_len")),
+        bool(a.get("lyrics")))),
+    "v_shorts": ("Shorts", lambda a: vwf.shorts(
+        a["source"], _csv(a.get("platforms")), _num(a.get("seconds"), float, 30), _num(a.get("start")),
+        None, a.get("caption") or "auto", a.get("song") or None, a.get("title") or None)),
+    "v_narrated": ("Narrated video", lambda a: vwf.narrated(
+        a["script"], a["title"], a.get("images") or None, a.get("voice") or None,
+        a.get("music") or None, a.get("aspect") or "16:9")),
+    "v_captions": ("Captions", lambda a: vwf.captions(
+        a["video"], a.get("style") or "bottom", bool(a.get("burn", True)), a.get("language") or None)),
 }
 
-PATH_RE = re.compile(re.escape(str(OUT_ROOT)) + r"/[^\s'\"]+")
+ROOTS = {"music": OUT_ROOT, "video": VIDEO_OUT}
+# Paths may contain spaces (song titles); they end at a newline or a " (" note.
+PATH_RE = re.compile("(?:" + "|".join(re.escape(str(r)) for r in ROOTS.values()) +
+                     r")/[^\n]+?\.(?:mp4|wav|mp3|png|jpg|pdf|mid|lrc|txt|aup3|ardour|otio|srt)\b")
 
 
 def _files_in(text: str) -> list[dict]:
     seen, out = set(), []
     for m in PATH_RE.findall(text or ""):
-        p = Path(m.rstrip(".,)"))
+        p = Path(m)
         if p.exists() and p not in seen:
             seen.add(p)
             out.append(_file_info(p))
@@ -223,37 +252,55 @@ def status_snapshot() -> dict:
             services.append({"id": k, "label": label, **res})
     disk = shutil.disk_usage(OUT_ROOT if OUT_ROOT.exists() else Path.home())
     return {"services": services,
-            "models": [{"label": k, "ok": p.exists()} for k, p in MODELS.items()],
+            "models": [{"label": k, "ok": p.exists()} for k, p in MODELS.items()]
+            + [{"label": "GPU video encode", "ok": vaapi_ok()}],
             "disk_free_gb": round(disk.free / 1e9, 1), "out_root": str(OUT_ROOT),
             "jobs_running": sum(j["status"] in ("queued", "running") for j in JOBS.values())}
 
 
 # --- files ----------------------------------------------------------------
 def _safe_path(rel: str) -> Path:
-    p = (OUT_ROOT / rel).resolve()
-    if not p.is_relative_to(OUT_ROOT.resolve()) or not p.exists():
+    """'music/…' or 'video/…' -> a real path inside that output folder (nothing outside)."""
+    root_key, _, rest = (rel or "").partition("/")
+    root = ROOTS.get(root_key)
+    if root is None:
+        raise FileNotFoundError(rel)
+    root = root.resolve()
+    p = (root / rest).resolve()
+    if not p.is_relative_to(root) or not p.exists():
         raise FileNotFoundError(rel)
     return p
 
 
 def _file_info(p: Path) -> dict:
     st = p.stat()
-    rel = p.resolve().relative_to(OUT_ROOT.resolve())
-    return {"path": str(rel), "name": p.name, "kind": rel.parts[0] if len(rel.parts) > 1 else "",
+    rp = p.resolve()
+    key, root = next((k, r.resolve()) for k, r in ROOTS.items() if rp.is_relative_to(r.resolve()))
+    rel = rp.relative_to(root)
+    return {"path": f"{key}/{rel}", "root": key, "abs": str(rp), "name": p.name,
+            "kind": rel.parts[0] if len(rel.parts) > 1 else "",
             "song": rel.parts[1] if len(rel.parts) > 2 else "", "ext": p.suffix.lower(),
             "size": st.st_size, "mtime": st.st_mtime, "dir": p.is_dir()}
 
 
-def recent_outputs(limit: int = 80) -> list[dict]:
-    if not OUT_ROOT.exists():
-        return []
+VIDEO_SHOW = {".mp4", ".otio", ".srt"}
+
+
+def recent_outputs(limit: int = 100) -> list[dict]:
     files = []
-    for p in OUT_ROOT.rglob("*"):
-        if "/acestep/" in str(p) or "/stems/" in str(p) or "/midi/" in str(p):
-            if p.suffix.lower() != ".mid":
+    if OUT_ROOT.exists():
+        for p in OUT_ROOT.rglob("*"):
+            if "/acestep/" in str(p) or "/stems/" in str(p) or "/midi/" in str(p):
+                if p.suffix.lower() != ".mid":
+                    continue
+            if p.is_file() and p.suffix.lower() in SHOW_EXT and not p.name.endswith(".raw.wav"):
+                files.append(p)
+    if VIDEO_OUT.exists():
+        for p in VIDEO_OUT.rglob("*"):
+            if "/segments/" in str(p) or "/stems/" in str(p) or not p.is_file():
                 continue
-        if p.is_file() and p.suffix.lower() in SHOW_EXT and not p.name.endswith(".raw.wav"):
-            files.append(p)
+            if p.suffix.lower() in VIDEO_SHOW or (p.suffix == ".png" and p.name.startswith("thumbnail")):
+                files.append(p)
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return [_file_info(p) for p in files[:limit]]
 
@@ -333,7 +380,7 @@ async def api_play(request):
 
 async def api_open(request):
     data = await body(request)
-    p = _safe_path(data.get("path") or ".")
+    p = _safe_path(data.get("path") or "music/")
     target = p if p.is_dir() or data.get("file") else p.parent
     subprocess.Popen(["xdg-open", str(target)], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

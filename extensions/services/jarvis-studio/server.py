@@ -165,6 +165,99 @@ def studio_sheet_music(song: str, parts: list[str] | None = None) -> str:
     return wf.sheet_music(song, parts)
 
 
+# --- Video studio ----------------------------------------------------------
+from studio.video import workflows as vwf  # noqa: E402
+
+
+@mcp.tool()
+@guarded("video_music_video")
+def video_music_video(song: str, style: str = "stems", aspect: str = "16:9",
+                      title: str | None = None, subtitle: str | None = None,
+                      background_image: str | None = None, section: str | None = None,
+                      lyrics: bool = True, audio_file: str | None = None) -> str:
+    """Music video for a StemDeck song. style: stems (a moving waveform lane per part),
+    spectrum (bars) or waves. aspect: 16:9, 9:16 or 1:1. section: e.g. 'chorus' for part of
+    the song. audio_file: use another mix as the soundtrack (e.g. an AI production master.wav).
+    About 20 s per 45 s of song."""
+    return vwf.music_video(song, style, aspect, title, subtitle, background_image, lyrics,
+                           section, None, None, audio_file)
+
+
+@mcp.tool()
+@guarded("video_perform_start")
+def video_perform_start(song: str, mode: str = "karaoke", semitones: int = 0,
+                        scene: str | None = None) -> str:
+    """Start a performance take: OBS starts recording, then the backing plays on the speakers.
+    mode: karaoke (no lead vocal), full, or no-<part> (e.g. no-guitar). This records the
+    camera/screen, so confirm with the user first. Finish with video_perform_finish."""
+    return vwf.perform_start(song, mode, semitones, scene)
+
+
+@mcp.tool()
+@guarded("video_perform_finish")
+def video_perform_finish(lyrics: bool = True) -> str:
+    """Stop the take, then line the recording up with the studio backing, mix, add lyrics."""
+    return vwf.perform_finish(lyrics)
+
+
+@mcp.tool()
+@guarded("video_performance")
+def video_performance(recording: str, song: str, lyrics: bool = True) -> str:
+    """Turn an existing recording (phone or OBS video of you playing/singing along to a song)
+    into a finished video: auto-aligned studio backing, levelled audio, lyrics, title."""
+    return vwf.performance(recording, song, None, lyrics)
+
+
+@mcp.tool()
+@guarded("video_obs_scene")
+def video_obs_scene(camera: str = "/dev/video0", mic: bool = True) -> str:
+    """Create an OBS 'Jarvis Performance' scene with the webcam and microphone. Turns the
+    camera on: only when the user asks."""
+    return obs.start() + "\n" + obs.setup_performance_scene(camera, mic)
+
+
+@mcp.tool()
+@guarded("video_auto_edit")
+def video_auto_edit(clips: str, song: str, aspect: str = "16:9", pace: str = "medium",
+                    title: str | None = None, section: str | None = None,
+                    max_seconds: float | None = None, lyrics: bool = False) -> str:
+    """Cut a folder (or comma-separated list) of video clips and photos to the beat of a song
+    (StemDeck title or an audio file). pace: slow, medium or fast. Also writes an
+    OpenTimelineIO timeline to fine-tune in Kdenlive."""
+    return vwf.auto_edit(clips, song, aspect, pace, title, section, None, max_seconds, lyrics)
+
+
+@mcp.tool()
+@guarded("video_shorts")
+def video_shorts(source: str, platforms: list[str] | None = None, seconds: float = 30,
+                 start: float | None = None, caption: str = "auto", song: str | None = None,
+                 title: str | None = None) -> str:
+    """Social clips from a video file or a StemDeck song. platforms: shorts, reels, tiktok
+    (9:16), square, instagram (1:1), youtube (16:9). Picks the chorus or loudest part unless
+    start is given. caption: auto, lyrics, speech or none. Makes thumbnails too. Never posts."""
+    return vwf.shorts(source, platforms, seconds, start, None, caption, song, title)
+
+
+@mcp.tool()
+@guarded("video_narrated")
+def video_narrated(script: str, title: str, images: str | None = None,
+                   voice_wav: str | None = None, music: str | None = None,
+                   aspect: str = "16:9") -> str:
+    """Narrated video: script text (blank line between paragraphs) or a .txt path is read by
+    MOSS-TTS; one slide per paragraph from your photos/clips folder (or generated text
+    slides); captions; optional music bed (StemDeck song or audio file), ducked under the voice."""
+    return vwf.narrated(script, title, images, voice_wav, music, aspect)
+
+
+@mcp.tool()
+@guarded("video_captions")
+def video_captions(video: str, style: str = "bottom", burn: bool = True,
+                   language: str | None = None) -> str:
+    """Subtitles for any video with Whisper (local, via Lemonade): an .srt file, plus a copy
+    with captions in the picture if burn=True. style: bottom or pop (big, short-form)."""
+    return vwf.captions(video, style, burn, language)
+
+
 class BearerAuth:
     def __init__(self, app):
         self.app = app

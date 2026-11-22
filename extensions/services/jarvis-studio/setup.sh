@@ -15,7 +15,7 @@ mkdir -p "$DATA"
 
 echo "==> venv"
 [ -x "$DATA/venv/bin/python" ] || "$UV" venv -q -p 3.12 "$DATA/venv"
-"$UV" pip install -q -p "$DATA/venv/bin/python" "mcp>=1.9,<2" httpx websockets uvicorn
+"$UV" pip install -q -p "$DATA/venv/bin/python" "mcp>=1.9,<2" httpx websockets uvicorn numpy
 
 echo "==> settings"
 if [ ! -f "$ENV" ]; then
