@@ -66,11 +66,11 @@ PY
 
 echo "==> systemd user service"
 mkdir -p "$HOME/.config/systemd/user"
-for unit in jarvis-studio jarvis-studio-dashboard; do
+for unit in jarvis-studio jarvis-studio-dashboard jarvis-llm-warmup; do
     sed "s#@HERE@#$HERE#g" "$HERE/$unit.service" > "$HOME/.config/systemd/user/$unit.service"
 done
 systemctl --user daemon-reload
-systemctl --user enable --now jarvis-studio.service jarvis-studio-dashboard.service
+systemctl --user enable --now jarvis-studio.service jarvis-studio-dashboard.service jarvis-llm-warmup.service
 systemctl --user restart jarvis-studio.service jarvis-studio-dashboard.service
 sleep 3
 curl -fsS "http://$JARVIS_STUDIO_BIND:$JARVIS_STUDIO_PORT/health" && echo
