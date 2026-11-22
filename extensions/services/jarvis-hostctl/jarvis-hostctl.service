@@ -1,0 +1,16 @@
+[Unit]
+Description=Jarvis Host Control (MCP server for ODS Hermes)
+After=graphical-session.target ydotoold.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/ods/data/jarvis-hostctl/hostctl.env
+Environment=YDOTOOL_SOCKET=/run/ydotoold/socket
+WorkingDirectory=%h/ods/extensions/services/jarvis-hostctl/app
+ExecStart=%h/ods/data/jarvis-hostctl/venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

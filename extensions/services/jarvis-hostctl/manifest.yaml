@@ -1,0 +1,53 @@
+schema_version: ods.services.v1
+
+compatibility:
+  ods_min: "3.0.0"
+
+service:
+  id: jarvis-hostctl
+  name: Jarvis Host Control
+  aliases: [hostctl, computer-control]
+  container_name: ""
+  default_host: localhost
+  port: 7720
+  external_port_env: JARVIS_HOSTCTL_PORT
+  external_port_default: 7720
+  health: /health
+  type: host-systemd
+  gpu_backends: [all]
+  category: optional
+  depends_on: [hermes]
+  env_vars:
+    - key: JARVIS_HOSTCTL_TOKEN
+      required: true
+      secret: true
+      description: Bearer token Hermes uses to reach the host-control MCP server.
+    - key: JARVIS_HOSTCTL_BIND
+      description: Address to listen on. The ODS Docker bridge gateway so only containers and the host can reach it.
+      default: "172.19.0.1"
+    - key: JARVIS_SCREEN_SCALE
+      description: Display scale factor (screenshot pixels / logical pixels), e.g. 1.35.
+      default: "1.0"
+    - key: JARVIS_SAFE_COMMANDS
+      description: Extra program names allowed to run without approval (space separated).
+    - key: JARVIS_NTFY_URL
+      description: ntfy server URL reachable from the phone, for approval notifications.
+    - key: JARVIS_NTFY_TOKEN
+      secret: true
+      description: ntfy access token for publishing approvals.
+
+features:
+  - id: computer-control
+    name: Computer Control
+    description: Lets Jarvis run commands and use the mouse and keyboard, with your approval for risky steps.
+    icon: Monitor
+    category: productivity
+    requirements:
+      services: [jarvis-hostctl, hermes]
+      vram_gb: 0
+    enabled_services_all: [jarvis-hostctl]
+    setup_time: ~5 minutes
+    priority: 40
+    launch:
+      type: none
+    gpu_backends: [all]
