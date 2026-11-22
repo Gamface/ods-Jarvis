@@ -1,0 +1,49 @@
+schema_version: ods.services.v1
+
+compatibility:
+  ods_min: "3.0.0"
+
+service:
+  id: jarvis-studio
+  name: Jarvis Studio
+  aliases: [studio, music-studio]
+  container_name: ""
+  default_host: 172.19.0.1
+  port: 7721
+  external_port_env: JARVIS_STUDIO_PORT
+  external_port_default: 7721
+  health: /health
+  type: host-systemd
+  gpu_backends: [all]
+  category: optional
+  depends_on: [hermes]
+  env_vars:
+    - key: JARVIS_STUDIO_TOKEN
+      required: true
+      secret: true
+      description: Bearer token Hermes uses to reach the studio MCP server.
+    - key: JARVIS_STUDIO_BIND
+      description: Address to listen on (the ODS Docker bridge gateway).
+      default: "172.19.0.1"
+    - key: JARVIS_OBS_PASSWORD
+      secret: true
+      description: obs-websocket password (setup.sh writes it into OBS's config).
+    - key: JARVIS_STEMDECK_URL
+      default: "http://127.0.0.1:8000"
+      description: Local StemDeck server.
+
+features:
+  - id: music-studio
+    name: Music Studio
+    description: Practice tracks, DAW sessions, karaoke, AI re-production and sheet music from any song, by voice.
+    icon: Music
+    category: creative
+    requirements:
+      services: [jarvis-studio, hermes]
+      vram_gb: 0
+    enabled_services_all: [jarvis-studio]
+    setup_time: ~10 minutes
+    priority: 41
+    launch:
+      type: none
+    gpu_backends: [all]

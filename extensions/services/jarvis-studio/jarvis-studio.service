@@ -1,0 +1,15 @@
+[Unit]
+Description=Jarvis Studio (MCP server: StemDeck, Ubuntu Studio apps, local AI music)
+After=graphical-session.target stemdeck.service
+Wants=stemdeck.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/ods/data/jarvis-studio/studio.env
+WorkingDirectory=@HERE@
+ExecStart=%h/ods/data/jarvis-studio/venv/bin/python server.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
