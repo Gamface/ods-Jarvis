@@ -106,3 +106,8 @@ Add the entry the script prints to `~/ods/data/hermes/config.yaml` under `mcp_se
 - **Sheet music** is an automatic transcription, so treat it as a draft. MuseScore 3 puts each part on a piano grand staff. MuseScore 4 engraves better.
 - **Song sections** (chorus, verse) depend on StemDeck's experimental detection. If a song has none, use `--start` and `--end` in seconds.
 - **Mixxx 2.5** can't load stem files. Mixxx 2.6 adds that.
+
+## Project NOMAD AI relay (optional)
+
+`scripts/nomad_ai_relay.py` (user unit `nomad-ai-relay.service`) lets Project NOMAD's AI chat use the same OpenRouter model as Hermes. NOMAD can't send an API key, so the relay listens only on NOMAD's Docker network gateway (`172.18.0.1:8765`), adds `OPENROUTER_API_KEY` from Hermes's `.env` and pins the model to Hermes's `model.default`. In NOMAD, the remote AI URL is `http://172.18.0.1:8765` (set via `POST /api/ollama/configure-remote`). Install: `sed "s#@HERE@#$PWD#g" nomad-ai-relay.service > ~/.config/systemd/user/nomad-ai-relay.service && systemctl --user enable --now nomad-ai-relay`.
+

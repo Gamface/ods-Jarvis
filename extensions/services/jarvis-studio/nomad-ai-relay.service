@@ -1,0 +1,11 @@
+[Unit]
+Description=Jarvis: relay Project NOMAD's AI chat to Hermes's OpenRouter model
+After=default.target
+
+[Service]
+ExecStart=/usr/bin/python3 @HERE@/scripts/nomad_ai_relay.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
