@@ -28,7 +28,7 @@ def build_session(stems: dict[str, Path], session_dir: Path, name: str,
     install_action()
     if not (session_dir / f"{name}.ardour").exists():
         session_dir.parent.mkdir(parents=True, exist_ok=True)
-        run(["ardour9-new_empty_session", "-s", "48000", str(session_dir), name])
+        run(["ardour9-new_session", "-s", "48000", str(session_dir), name])  # with a stereo master bus
     stem_dir = session_dir / "stems"
     stem_dir.mkdir(exist_ok=True)
     order = ["vocals", "drums", "bass", "guitar", "piano", "other"]
@@ -39,7 +39,8 @@ def build_session(stems: dict[str, Path], session_dir: Path, name: str,
         (stem_dir / "tempo.txt").write_text(f"{bpm}\n")
     msg = (f"Ardour session ready: {session_dir / (name + '.ardour')}. In Ardour run "
            "Edit > Lua Scripts > Script Manager > 'Jarvis: Import StemDeck stems' "
-           "(assign it to an action button once) to build one track per stem.")
+           "(assign it to an action button once) to build one track per stem, plus a Surge XT synth "
+           "track, a DrumGizmo drum track (DRSKit) and LSP EQ/compressor/limiter, added switched off.")
     if open_gui:
         subprocess.Popen(["ardour", str(session_dir / f"{name}.ardour")], start_new_session=True,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

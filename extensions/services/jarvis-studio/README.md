@@ -95,12 +95,13 @@ Add the entry the script prints to `~/ods/data/hermes/config.yaml` under `mcp_se
 | MOSS-TTS-Nano | `~/ai-models/MOSS-TTS-Nano` |
 | basic-pitch (ONNX, with TensorFlow removed) | `~/ai-models/basic-pitch` |
 | Ubuntu Studio apps | Audacity, Ardour 9, Guitarix, OBS, MuseScore 3, rubberband, ffmpeg |
+| Plugins | LSP Plugins and DrumGizmo (Ubuntu Studio packages); Surge XT 1.3.4 installed per user from its GitHub release (`~/.lv2`, `~/.vst3`, `~/.clap`, data in `~/.local/share/surge-xt`); DrumGizmo kit DRSKit in `~/Music/DrumGizmo/DRSKit`, set as DrumGizmo's default kit in `~/.config/drumgizmo/drumgizmo.conf` |
 
 ## Known limits
 
 - **Kdenlive** opens beat-cut edits through **File > Import > OpenTimelineIO**. The `.otio` files are checked with the OpenTimelineIO library, but the Kdenlive import itself hasn't been tried yet.
 - **AI video generation** isn't practical here: there's no NVIDIA GPU. The video tools edit, compose and caption your own footage and the studio's audio.
-- **Ardour** can't import audio without its window open. `daw` creates the session with the stems inside it and installs a Lua action. In Ardour, run **Edit > Lua Scripts > Script Manager > "Jarvis: Import StemDeck stems"** once; assign it to an action button so later imports take one click.
+- **Ardour** can't import audio without its window open. `daw` creates the session with the stems inside it and installs a Lua action. In Ardour, run **Edit > Lua Scripts > Script Manager > "Jarvis: Import StemDeck stems"** once; assign it to an action button so later imports take one click. The same action adds a production setup: an LSP Parametric EQ and LSP Compressor on every audio track and an LSP Limiter on the master (all added switched off, so the sound is unchanged until you turn them on), plus a "Synth (Surge XT)" and a "Drums (DrumGizmo)" MIDI track. Running it again adds nothing twice. Sessions are created with `ardour9-new_session`, so they have a stereo master bus.
 - **OBS** won't record until its first-run Auto-Configuration Wizard has been finished or cancelled once. Add a camera or screen source to a scene for Performance videos.
 - **Sheet music** is an automatic transcription, so treat it as a draft. MuseScore 3 puts each part on a piano grand staff. MuseScore 4 engraves better.
 - **Song sections** (chorus, verse) depend on StemDeck's experimental detection. If a song has none, use `--start` and `--end` in seconds.
