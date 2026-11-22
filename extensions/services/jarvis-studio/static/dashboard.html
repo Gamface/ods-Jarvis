@@ -382,16 +382,35 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
 
       <!-- create -->
       <div class="pane" id="pane-create">
-        <p class="pane-intro">Make something new: music from a description (ACE-Step 1.5) or speech in a cloned voice (MOSS-TTS-Nano). No song needed.</p>
-        <div class="field"><label class="f" for="mmCaption">Describe the music</label>
-          <input type="text" id="mmCaption" placeholder="dreamy synthwave, 90 bpm, female vocals"></div>
+        <p class="pane-intro">Write a brand-new song with ACE-Step 1.5 on this computer, sung if you add lyrics or instrumental if you don't. New songs go into the library, ready for practice, karaoke and the video studio.</p>
+        <div class="subhead">New song</div>
         <div class="row">
-          <div class="field" style="flex:3 1 260px"><label class="f" for="mmLyrics">Lyrics (optional; blank = instrumental)</label>
-            <textarea id="mmLyrics" placeholder="[verse]&#10;…"></textarea></div>
-          <div class="field"><label class="f" for="mmDur">Length <span class="val" id="mmDurV">30 s</span></label>
-            <input type="range" id="mmDur" min="10" max="180" step="5" value="30"></div>
+          <div class="field" style="flex:2 1 260px"><label class="f" for="mmCaption">Describe the song</label>
+            <input type="text" id="mmCaption" placeholder="soulful R&amp;B, warm Rhodes, tight drums, female vocals">
+            <div class="presets" id="mmPresets"></div></div>
+          <div class="field"><label class="f" for="mmTitle">Title</label><input type="text" id="mmTitle" placeholder="Untitled"></div>
         </div>
-        <div class="actions" style="margin-bottom:22px"><button class="btn primary" data-run="make_music">Generate music</button><span class="hint">About 2× the length on CPU.</span></div>
+        <div class="field"><label class="f" for="mmLyrics">Lyrics (blank = instrumental). Use [verse], [chorus], [bridge] tags.</label>
+          <textarea id="mmLyrics" style="min-height:130px" placeholder="[verse]&#10;City lights are humming low&#10;&#10;[chorus]&#10;…"></textarea>
+          <div class="hint">Tip: ask Jarvis to write the lyrics first ("write lyrics for a late-night R&amp;B song about…").</div></div>
+        <div class="row">
+          <div class="field"><label class="f" for="mmDur">Length <span class="val" id="mmDurV">60 s</span></label>
+            <input type="range" id="mmDur" min="10" max="300" step="5" value="60"></div>
+          <div class="field"><label class="f" for="mmBpm">Tempo (BPM)</label><input type="number" id="mmBpm" min="40" max="240" placeholder="auto"></div>
+          <div class="field"><label class="f" for="mmKey">Key</label>
+            <select id="mmKey"><option value="">Auto</option></select></div>
+          <div class="field"><label class="f" for="mmLang">Vocal language</label>
+            <select id="mmLang"><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
+              <option value="pt">Portuguese</option><option value="de">German</option><option value="it">Italian</option>
+              <option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option></select></div>
+        </div>
+        <div class="field">
+          <label class="check"><input type="checkbox" id="mmLibrary" checked> Add to the library (splits the parts)</label>
+          <label class="check"><input type="checkbox" id="mmPlay"> Play on speakers when done</label>
+        </div>
+        <div class="actions" style="margin-bottom:6px"><button class="btn primary" data-run="make_music">Write the song</button><span class="hint" id="mmEta">About 2 min for 60 s, plus about 1 min to split.</span></div>
+        <hr class="divider">
+        <div class="subhead">Speech</div>
         <div class="field"><label class="f" for="spText">Say this</label>
           <textarea id="spText" placeholder="Good evening. Tonight's set starts in five minutes."></textarea></div>
         <div class="field"><label class="f" for="spVoice">Voice to clone (optional WAV path)</label>
@@ -712,7 +731,14 @@ bindVal("#prSpeed", "#prSpeedV", v => v + "%");
 bindVal("#prKey", "#prKeyV", v => (v > 0 ? "+" : "") + v + " st");
 bindVal("#kaKey", "#kaKeyV", v => (v > 0 ? "+" : "") + v + " st");
 bindVal("#poStrength", "#poStrengthV", v => Number(v).toFixed(2));
-bindVal("#mmDur", "#mmDurV", v => v + " s");
+bindVal("#mmDur", "#mmDurV", v => v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}` : v + " s");
+$("#mmDur").addEventListener("input", () => { const v = +$("#mmDur").value;
+  $("#mmEta").textContent = `About ${Math.max(1, Math.round(v * 2 / 60))} min to write${$("#mmLibrary").checked ? `, plus about ${Math.max(1, Math.round(v * 1.2 / 60))} min to split` : ""}.`; });
+$("#mmKey").append(...["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"].flatMap(n =>
+  [el("option", { value: `${n} major`, text: `${n} major` }), el("option", { value: `${n} minor`, text: `${n} minor` })]));
+const SONG_PRESETS = ["soulful R&B, warm Rhodes, female vocals", "gospel choir, Hammond organ, uplifting", "lo-fi hip hop, dusty drums, mellow keys",
+  "synthwave, analog pads, driving bass", "acoustic folk, fingerpicked guitar, male vocals", "afrobeats, percussive, bright guitars", "cinematic orchestral, strings, epic"];
+$("#mmPresets").replaceChildren(...SONG_PRESETS.map(p => el("button", { class: "btn sm", type: "button", text: p.split(",")[0], title: p, onclick: () => $("#mmCaption").value = p })));
 $("#prSection").onchange = e => $("#prCustom").hidden = e.target.value !== "__custom";
 $("#poPresets").replaceChildren(...STYLES.map(s => el("button", { class: "btn sm", type: "button", text: s.split(",")[0], title: s, onclick: () => $("#poStyle").value = s })));
 
@@ -770,7 +796,12 @@ const BUILDERS = {
     return { song: state.song.job_id, style, keep, strength: +$("#poStrength").value, intro: $("#poIntro").value.trim(), video: $("#poVideo").checked };
   },
   sheet() { if (!needSong()) return; return { song: state.song.job_id, parts: stemsIn("#shParts", "on") }; },
-  make_music() { const c = $("#mmCaption").value.trim(); if (!c) { toast("Describe the music first.", true); return; } return { caption: c, lyrics: $("#mmLyrics").value.trim(), duration: +$("#mmDur").value }; },
+  make_music() {
+    const c = $("#mmCaption").value.trim(); if (!c) { toast("Describe the song first.", true); return; }
+    return { caption: c, title: $("#mmTitle").value.trim(), lyrics: $("#mmLyrics").value.trim(), duration: +$("#mmDur").value,
+      bpm: $("#mmBpm").value, key: $("#mmKey").value, language: $("#mmLang").value,
+      library: $("#mmLibrary").checked, play: $("#mmPlay").checked };
+  },
   v_music_video() {
     if (!needSong()) return;
     return { song: state.song.job_id, style: segVal("#mvStyle"), aspect: segVal("#mvAspect"), section: $("#mvSection").value,
@@ -882,7 +913,7 @@ function preview(f) {
   a.src = "/files/" + encodeURI(f.path); a.play().catch(() => {});
   $("#nowName").textContent = f.name; $("#nowSub").textContent = f.song || f.kind || "";
 }
-const KINDS = { all: "All", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech",
+const KINDS = { all: "All", songs: "Songs", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech",
   "music-videos": "Music videos", performances: "Performances", edits: "Edits", shorts: "Shorts", narrated: "Narrated", captions: "Captions" };
 const VIDEO_KINDS = new Set(["music-videos", "performances", "edits", "shorts", "narrated", "captions"]);
 async function loadOutputs() {

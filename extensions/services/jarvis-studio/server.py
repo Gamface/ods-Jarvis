@@ -141,11 +141,18 @@ def studio_ai_produce(song: str, style: str, keep: list[str] | None = None,
 
 @mcp.tool()
 @guarded("make_music")
-def studio_make_music(caption: str, duration: float = 30, lyrics: str | None = None) -> str:
-    """Generate new music from a text description with ACE-Step 1.5 (CPU: ~2x duration)."""
-    from studio.config import out_dir
-    path = wf.generate_music(caption, out_dir("generated"), duration, lyrics)
-    return f"Generated: {path}"
+def studio_make_music(caption: str, title: str | None = None, lyrics: str | None = None,
+                      duration: float = 60, bpm: int | None = None, key: str | None = None,
+                      language: str | None = None, seed: int | None = None,
+                      add_to_library: bool = True, play: bool = False) -> str:
+    """Write a new song with ACE-Step 1.5 on this computer. caption: genre, mood,
+    instruments and voice (e.g. 'soulful R&B, warm Rhodes, female vocals, 90s').
+    lyrics: with [verse]/[chorus]/[bridge] tags for a sung song; leave empty for an
+    instrumental. bpm, key (e.g. 'A minor'), language ('en', 'es'...) are optional.
+    add_to_library splits it in StemDeck so practice, karaoke and video tools can use it.
+    Takes about 2x the length on CPU (plus the split): say so before starting."""
+    return wf.make_song(caption, title, lyrics, duration, bpm, key, language, seed,
+                        add_to_library, play)
 
 
 @mcp.tool()
@@ -163,6 +170,31 @@ def studio_speak(text: str, voice_wav: str | None = None, play: bool = True) -> 
 def studio_sheet_music(song: str, parts: list[str] | None = None) -> str:
     """Transcribe parts of a song to MIDI (basic-pitch) and engrave PDFs (MuseScore)."""
     return wf.sheet_music(song, parts)
+
+
+@mcp.tool()
+@guarded("workspace")
+def studio_workspace(action: str, path: str = "", content: str | None = None,
+                     slug: str | None = None, stage: str | None = None, title: str | None = None,
+                     note: str = "") -> str:
+    """The ~/Studio workspace (pipeline, research, community, clients, reports).
+    action: status | tree | read | write | append | new_item | move.
+    path is relative to ~/Studio. new_item needs title; move needs slug and stage
+    (1-ideas, 2-scripts, 3-production, 4-review, 5-published, rejected). Nothing is deleted."""
+    from studio import workspace as ws
+    if action == "status":
+        return ws.status()
+    if action == "tree":
+        return ws.tree(path)
+    if action == "read":
+        return ws.read(path)
+    if action in ("write", "append"):
+        return ws.write(path, content or "", append=action == "append")
+    if action == "new_item":
+        return ws.new_item(title or "untitled", stage or "1-ideas")
+    if action == "move":
+        return ws.move(slug or "", stage or "", note)
+    raise ValueError("action must be status, tree, read, write, append, new_item or move")
 
 
 # --- Video studio ----------------------------------------------------------

@@ -79,6 +79,14 @@ def main() -> int:
     s = sub.add_parser("sheet", help="5: sheet music PDFs and MIDI")
     s.add_argument("song"), s.add_argument("--parts"), s.add_argument("--no-pdf", action="store_true")
 
+    s = sub.add_parser("make", help="write a new song with ACE-Step (adds it to the library)")
+    s.add_argument("caption"), s.add_argument("--title"), s.add_argument("--lyrics", help="text or a .txt path")
+    s.add_argument("--duration", type=float, default=60), s.add_argument("--bpm", type=int)
+    s.add_argument("--key"), s.add_argument("--language"), s.add_argument("--seed", type=int)
+    s.add_argument("--no-library", action="store_true"), s.add_argument("--play", action="store_true")
+
+    s = sub.add_parser("status", help="~/Studio pipeline status")
+
     # Video studio
     s = sub.add_parser("music-video", help="V1: music video for a song")
     s.add_argument("song"), s.add_argument("--style", default="stems", choices=["stems", "spectrum", "waves"])
@@ -117,6 +125,18 @@ def main() -> int:
     s.add_argument("--no-burn", action="store_true"), s.add_argument("--language")
 
     a = p.parse_args()
+    if a.cmd == "make":
+        from pathlib import Path
+        lyr = a.lyrics
+        if lyr and "\n" not in lyr and Path(lyr).expanduser().is_file():
+            lyr = Path(lyr).expanduser().read_text()
+        print(wf.make_song(a.caption, a.title, lyr, a.duration, a.bpm, a.key, a.language, a.seed,
+                           not a.no_library, a.play))
+        return 0
+    if a.cmd == "status":
+        from . import workspace
+        print(workspace.status())
+        return 0
     if a.cmd in VIDEO_CMDS:
         print(video(a))
         return 0

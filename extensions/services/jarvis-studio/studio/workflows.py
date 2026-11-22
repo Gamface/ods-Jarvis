@@ -143,16 +143,54 @@ def speak(text: str, dest: Path, voice: str | None = None) -> Path:
 
 def generate_music(caption: str, out: Path, duration: float = 30, lyrics: str | None = None,
                    task: str = "text2music", src_audio: Path | None = None,
-                   strength: float = 0.5) -> Path:
+                   strength: float = 0.5, bpm: int | None = None, key: str | None = None,
+                   time_signature: str | None = None, language: str | None = None,
+                   seed: int | None = None) -> Path:
     args = {"out_dir": str(out), "caption": caption, "lyrics": lyrics, "task": task,
             "duration": duration, "strength": strength,
-            "src_audio": str(src_audio) if src_audio else None}
+            "src_audio": str(src_audio) if src_audio else None, "bpm": bpm, "key": key,
+            "time_signature": time_signature, "language": language, "seed": seed}
     proc = audio.run([_venv_python(ACESTEP_DIR), str(SCRIPTS_DIR / "acestep_generate.py"),
-                      json.dumps(args)], timeout=3600)
+                      json.dumps(args)], timeout=7200)
     for line in proc.stdout.splitlines():
         if line.startswith("OUTPUT "):
             return Path(line[7:].strip())
     raise RuntimeError("ACE-Step finished without an output file")
+
+
+def make_song(caption: str, title: str | None = None, lyrics: str | None = None,
+              duration: float = 60, bpm: int | None = None, key: str | None = None,
+              language: str | None = None, seed: int | None = None,
+              add_to_library: bool = True, play: bool = False) -> str:
+    """Write a new song with ACE-Step 1.5 (vocals when lyrics are given, else instrumental),
+    save it under ~/Music/Jarvis/songs/<title>.wav and, by default, add it to the StemDeck
+    library so every music and video workflow can use it."""
+    if not caption.strip():
+        raise ValueError("Describe the song (genre, mood, instruments, voice).")
+    if not 10 <= float(duration) <= 600:
+        raise ValueError("duration must be 10-600 seconds")
+    title = title or caption.split(",")[0][:40]
+    tmp = out_dir("generated", "raw")
+    raw = generate_music(caption, tmp, duration, lyrics or None, bpm=bpm, key=key,
+                         language=language, seed=seed)
+    dest = out_dir("songs") / f"{safe_name(title)}.wav"
+    n = 2
+    while dest.exists():
+        dest = dest.with_name(f"{safe_name(title)} ({n}).wav")
+        n += 1
+    shutil.move(str(raw), dest)
+    (dest.with_suffix(".txt")).write_text(
+        f"Title: {title}\nPrompt: {caption}\nBPM: {bpm or 'auto'}  Key: {key or 'auto'}\n"
+        f"Length: {duration:.0f} s\nSeed: {seed if seed is not None else 'random'}\n\n"
+        f"Lyrics:\n{lyrics or '[Instrumental]'}\n")
+    report = [f"New song '{title}' ({'vocals' if lyrics else 'instrumental'}, {duration:.0f} s): {dest}"]
+    if add_to_library:
+        job = sd.wait(sd.submit(str(dest)))
+        report.append(f"Added to the library as '{job['title']}' ({job.get('key')}, {job.get('bpm')} BPM, "
+                      f"parts: {', '.join(sd.stem_names(job))}). It's ready for practice, karaoke and videos.")
+    if play:
+        report.append(audio.play(dest))
+    return "\n".join(report)
 
 
 def ai_produce(song: str, style: str, keep: list[str] | None = None, strength: float = 0.45,

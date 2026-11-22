@@ -80,9 +80,10 @@ def _num(v, cast=float, default=None):
 
 
 def _make_music(a):
-    path = wf.generate_music(a["caption"], out_dir("generated"), _num(a.get("duration"), float, 30),
-                             a.get("lyrics") or None)
-    return f"Generated: {path}"
+    return wf.make_song(a["caption"], a.get("title") or None, a.get("lyrics") or None,
+                        _num(a.get("duration"), float, 60), _num(a.get("bpm"), int),
+                        a.get("key") or None, a.get("language") or None, _num(a.get("seed"), int),
+                        bool(a.get("library", True)), bool(a.get("play")))
 
 
 def _speak(a):
@@ -115,7 +116,7 @@ WORKFLOWS = {
         a["song"], a["style"], _csv(a.get("keep")), _num(a.get("strength"), float, 0.45),
         a.get("intro") or None, None, a.get("cover_image") or None, bool(a.get("video", True)))),
     "sheet": ("Sheet music", lambda a: wf.sheet_music(a["song"], _csv(a.get("parts")))),
-    "make_music": ("Make music", _make_music),
+    "make_music": ("New song", _make_music),
     "speak": ("Speak", _speak),
     # Video studio
     "v_music_video": ("Music video", lambda a: vwf.music_video(

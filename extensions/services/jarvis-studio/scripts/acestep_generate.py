@@ -1,7 +1,8 @@
 """Run with ACE-Step's own venv python:  acestep_generate.py <json-args>
 
 Args (JSON): {"out_dir", "caption", "lyrics", "task": "text2music"|"cover"|"repaint",
-              "src_audio", "duration", "strength", "seed", "steps"}
+              "src_audio", "duration", "strength", "seed", "steps",
+              "bpm", "key", "time_signature", "language"}
 Prints one line: OUTPUT <path>
 """
 
@@ -33,8 +34,16 @@ params = dict(
     instrumental=not args.get("lyrics"),
     duration=args.get("duration"),
     inference_steps=int(args.get("steps", 8)),
-    seed=int(args.get("seed", -1)),
+    seed=int(args.get("seed") if args.get("seed") is not None else -1),
 )
+if args.get("bpm"):
+    params["bpm"] = int(args["bpm"])
+if args.get("key"):
+    params["keyscale"] = str(args["key"])          # e.g. "C major", "A minor"
+if args.get("time_signature"):
+    params["timesignature"] = str(args["time_signature"])  # "4" for 4/4, "3" for 3/4
+if args.get("language") and args.get("lyrics"):
+    params["vocal_language"] = str(args["language"])  # e.g. "en", "es"
 if task in ("cover", "repaint") and args.get("src_audio"):
     params["src_audio"] = args["src_audio"]
     params["audio_cover_strength"] = float(args.get("strength", 0.5))
