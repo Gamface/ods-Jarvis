@@ -16,6 +16,20 @@ Extra tools: `studio_split`, `studio_make_music` (ACE-Step text-to-music), `stud
 
 `song` can be a title or id that's already in StemDeck, an audio file path, or a YouTube or SoundCloud link. A link or file is split first. Only use audio you have the right to use.
 
+## Dashboard
+
+Open **http://127.0.0.1:7722**, or **Jarvis Studio** in the app menu. It runs as the `jarvis-studio-dashboard` user service and only answers on this computer.
+
+- **Status bar**: StemDeck, the Hermes MCP server, the Hermes container, Lemonade, Guitarix, OBS, Audacity, Ardour, playback, AI models and free disk space.
+- **Library**: every song in StemDeck with key, BPM and length. Pick one to see how present each part is. **Add a song** splits a file or link.
+- **Workflow tabs**: forms for the five workflows plus **Create** (ACE-Step music, MOSS-TTS speech). Click a part to mute it, again to solo it.
+- **Rigs**: open Guitarix and switch presets; open OBS, change scene, start or stop recording (asks first).
+- **Jobs**: workflows run in the background (two at a time) with results and file buttons.
+- **Outputs**: recent files in `~/Music/Jarvis`. Preview in the browser, play on the computer speakers, open PDFs and videos, or show in the folder.
+- **Activity**: the shared audit log, so you see what Hermes did as well as the dashboard.
+
+Requests must come from `localhost`, and every action needs a JSON body with an `X-Jarvis` header, so other websites can't drive it from your browser.
+
 ## Timings on this computer (i9-12900H, CPU only)
 
 | Step | Time |
@@ -36,8 +50,8 @@ The script needs no sudo and is safe to run again. It does five things:
 1. Makes a venv in `~/ods/data/jarvis-studio/venv`.
 2. Writes a token and settings to `studio.env` (mode 600).
 3. Turns on Audacity's `mod-script-pipe` and OBS's websocket server, both local only.
-4. Installs the `jarvis-studio` systemd user service, listening on the ODS Docker bridge `172.19.0.1:7721`.
-5. Installs the `jarvis-studio` command.
+4. Installs the `jarvis-studio` systemd user service, listening on the ODS Docker bridge `172.19.0.1:7721`, and the `jarvis-studio-dashboard` service on `127.0.0.1:7722`.
+5. Installs the `jarvis-studio` command and a **Jarvis Studio** app-menu launcher.
 
 Add the entry the script prints to `~/ods/data/hermes/config.yaml` under `mcp_servers:`, then run `docker restart ods-hermes`.
 

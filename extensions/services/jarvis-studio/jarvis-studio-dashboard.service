@@ -1,0 +1,15 @@
+[Unit]
+Description=Jarvis Studio dashboard (local web page on 127.0.0.1:7722)
+After=graphical-session.target jarvis-studio.service stemdeck.service
+Wants=stemdeck.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/ods/data/jarvis-studio/studio.env
+WorkingDirectory=@HERE@
+ExecStart=%h/ods/data/jarvis-studio/venv/bin/python dashboard.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

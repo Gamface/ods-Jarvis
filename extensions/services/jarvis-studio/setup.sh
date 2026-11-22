@@ -4,7 +4,7 @@
 # 1. Python venv in ~/ods/data/jarvis-studio/venv
 # 2. Token + settings in ~/ods/data/jarvis-studio/studio.env (mode 600)
 # 3. Enables Audacity's mod-script-pipe and OBS's websocket server (local only)
-# 4. Installs and starts the jarvis-studio systemd user service
+# 4. Installs and starts the jarvis-studio and dashboard systemd user services
 # 5. Prints the Hermes mcp_servers entry
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -66,12 +66,15 @@ PY
 
 echo "==> systemd user service"
 mkdir -p "$HOME/.config/systemd/user"
-sed "s#@HERE@#$HERE#g" "$HERE/jarvis-studio.service" > "$HOME/.config/systemd/user/jarvis-studio.service"
+for unit in jarvis-studio jarvis-studio-dashboard; do
+    sed "s#@HERE@#$HERE#g" "$HERE/$unit.service" > "$HOME/.config/systemd/user/$unit.service"
+done
 systemctl --user daemon-reload
-systemctl --user enable --now jarvis-studio.service
-systemctl --user restart jarvis-studio.service
+systemctl --user enable --now jarvis-studio.service jarvis-studio-dashboard.service
+systemctl --user restart jarvis-studio.service jarvis-studio-dashboard.service
 sleep 3
 curl -fsS "http://$JARVIS_STUDIO_BIND:$JARVIS_STUDIO_PORT/health" && echo
+curl -fsS "http://127.0.0.1:7722/health" && echo "  dashboard: http://127.0.0.1:7722"
 
 cat <<EOF
 
@@ -94,3 +97,16 @@ cd "$HERE" && exec "$DATA/venv/bin/python" -m studio "\$@"
 EOW
 chmod +x "$HOME/.local/bin/jarvis-studio"
 echo "CLI installed: jarvis-studio --help"
+
+# App-menu launcher for the dashboard
+mkdir -p "$HOME/.local/share/applications"
+cat > "$HOME/.local/share/applications/jarvis-studio.desktop" <<EOD
+[Desktop Entry]
+Type=Application
+Name=Jarvis Studio
+Comment=Dashboard for StemDeck, the studio apps and local AI music
+Exec=xdg-open http://127.0.0.1:7722
+Icon=multimedia-audio-player
+Categories=AudioVideo;Audio;
+EOD
+echo "Dashboard: http://127.0.0.1:7722 (also in the app menu as Jarvis Studio)"
