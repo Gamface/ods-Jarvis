@@ -156,6 +156,20 @@ def studio_make_music(caption: str, title: str | None = None, lyrics: str | None
 
 
 @mcp.tool()
+@guarded("make_image")
+def studio_make_image(prompt: str, title: str | None = None, size: str = "512x512",
+                      model: str | None = None, seed: int | None = None) -> str:
+    """Make a picture (album cover, poster, thumbnail, concept art) on this computer with
+    Stable Diffusion through Lemonade. prompt: subject, style, mood, colours, e.g.
+    'album cover, snowy mountain town at dusk, warm lights, cinematic'. size: 512x512
+    (default), 768x512, 512x768 or 768x768. model: SD-Turbo (default, fast) or SDXL-Turbo
+    if downloaded. Takes about 35 s on CPU. Saved to ~/Music/Jarvis/images and shown in
+    the dashboard's Studio box. Waits if a song is being made."""
+    from studio import images
+    return images.make_image(prompt, title, size, model, seed)
+
+
+@mcp.tool()
 @guarded("speak")
 def studio_speak(text: str, voice_wav: str | None = None, play: bool = True) -> str:
     """Say text with MOSS-TTS-Nano (optionally cloning the voice in voice_wav)."""

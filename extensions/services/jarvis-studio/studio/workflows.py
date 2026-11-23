@@ -150,8 +150,10 @@ def generate_music(caption: str, out: Path, duration: float = 30, lyrics: str | 
             "duration": duration, "strength": strength,
             "src_audio": str(src_audio) if src_audio else None, "bpm": bpm, "key": key,
             "time_signature": time_signature, "language": language, "seed": seed}
-    proc = audio.run([_venv_python(ACESTEP_DIR), str(SCRIPTS_DIR / "acestep_generate.py"),
-                      json.dumps(args)], timeout=7200)
+    from .images import heavy_job  # one heavy AI job at a time (songs and images)
+    with heavy_job("song"):
+        proc = audio.run([_venv_python(ACESTEP_DIR), str(SCRIPTS_DIR / "acestep_generate.py"),
+                          json.dumps(args)], timeout=7200)
     for line in proc.stdout.splitlines():
         if line.startswith("OUTPUT "):
             return Path(line[7:].strip())
