@@ -113,9 +113,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 @media (max-width: 520px) { .presence { grid-template-columns: repeat(3, 1fr); } }
 
 /* tabs */
-.tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-.tab { border: 0; background: none; padding: 11px 12px; cursor: pointer; color: var(--ink-2); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
-.tab .num { font-family: var(--mono); font-size: 11px; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; background: var(--panel-2); color: var(--ink-3); }
+.tabs { display: flex; flex-wrap: wrap; gap: 0; padding: 0 6px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tab { border: 0; background: none; padding: 7px 7px; cursor: pointer; color: var(--ink-2); font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+.tab .num { font-family: var(--mono); font-size: 10px; width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; background: var(--panel-2); color: var(--ink-3); }
 .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
 .tab.on .num { background: var(--accent); color: var(--accent-ink); }
 .pane { display: none; padding: 18px; }
@@ -311,16 +311,16 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
 
     <section class="panel" id="musicPanel">
       <nav class="tabs" role="tablist">
-        <button class="tab on" data-tab="practice" role="tab"><span class="num">1</span>Practice</button>
+        <button class="tab on" data-tab="create" role="tab"><span class="num">+</span>Create</button>
+        <button class="tab" data-tab="practice" role="tab"><span class="num">1</span>Practice</button>
         <button class="tab" data-tab="daw" role="tab"><span class="num">2</span>DAW</button>
         <button class="tab" data-tab="karaoke" role="tab"><span class="num">3</span>Karaoke</button>
-        <button class="tab" data-tab="produce" role="tab"><span class="num">4</span>AI re-production</button>
-        <button class="tab" data-tab="sheet" role="tab"><span class="num">5</span>Sheet music</button>
-        <button class="tab" data-tab="create" role="tab"><span class="num">+</span>Create</button>
+        <button class="tab" data-tab="produce" role="tab"><span class="num">4</span>AI remix</button>
+        <button class="tab" data-tab="sheet" role="tab"><span class="num">5</span>Sheet</button>
       </nav>
 
       <!-- 1 practice -->
-      <div class="pane on" id="pane-practice">
+      <div class="pane" id="pane-practice">
         <p class="pane-intro">Build a practice track from the stems. Click a part to mute it, click again to solo it.</p>
         <div class="field"><label class="f">Parts</label><div class="stems" id="prStems" data-mode="mute"></div></div>
         <div class="row">
@@ -404,7 +404,7 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
       </div>
 
       <!-- create -->
-      <div class="pane" id="pane-create">
+      <div class="pane on" id="pane-create">
         <p class="pane-intro">Write a brand-new song with ACE-Step 1.5 on this computer, sung if you add lyrics or instrumental if you don't. New songs go into the library, ready for practice, karaoke and the video studio.</p>
         <div class="subhead">New song</div>
         <div class="row">
@@ -446,11 +446,11 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
 
     <section class="panel" id="videoPanel" hidden>
       <nav class="tabs" role="tablist">
-        <button class="tab on" data-tab="v1" role="tab"><span class="num">1</span>Music video</button>
-        <button class="tab" data-tab="v2" role="tab"><span class="num">2</span>Performance</button>
-        <button class="tab" data-tab="v3" role="tab"><span class="num">3</span>Beat-cut edit</button>
+        <button class="tab on" data-tab="v1" role="tab"><span class="num">1</span>Video</button>
+        <button class="tab" data-tab="v2" role="tab"><span class="num">2</span>Perform</button>
+        <button class="tab" data-tab="v3" role="tab"><span class="num">3</span>Beat-cut</button>
         <button class="tab" data-tab="v4" role="tab"><span class="num">4</span>Shorts</button>
-        <button class="tab" data-tab="v5" role="tab"><span class="num">5</span>Narrated</button>
+        <button class="tab" data-tab="v5" role="tab"><span class="num">5</span>Narrate</button>
         <button class="tab" data-tab="vc" role="tab"><span class="num">+</span>Captions</button>
       </nav>
 
