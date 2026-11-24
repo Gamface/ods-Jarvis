@@ -163,6 +163,24 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .ico { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; font-size: 10px; font-weight: 700; font-family: var(--mono); background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line); text-transform: uppercase; }
 .ico.wav, .ico.mp3, .ico.flac { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .ico.mp4 { background: var(--solo-soft); color: var(--solo); border-color: transparent; }
+.ph-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.ph-bar input { flex: 1 1 200px; width: auto; }
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ph-card { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel-2); cursor: pointer; padding: 0; text-align: left; }
+.ph-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.ph-card span { display: block; padding: 6px 8px; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-card .tag { position: absolute; top: 6px; left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; font-weight: 700; letter-spacing: .04em; }
+.ph-card.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ph-detail { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.ph-detail img { width: 100%; max-height: 460px; object-fit: contain; border-radius: 8px; background: var(--bg); }
+.ph-detail h3 { font-size: 16px; overflow-wrap: anywhere; }
+.ph-detail .prompt { font-size: 13px; color: var(--ink-2); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.ph-detail .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+@media (max-width: 820px) { .ph-detail { grid-template-columns: 1fr; } }
+.drop { display: grid; place-items: center; gap: 4px; text-align: center; padding: 34px 16px; border: 2px dashed var(--line-strong); border-radius: 12px; cursor: pointer; color: var(--ink-2); }
+.drop b { color: var(--ink); font-size: 15px; }
+.drop span { font-size: 12px; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
 .thumb { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; border: 1px solid var(--line); }
 .pic { display: block; max-width: min(100%, 384px); border-radius: 10px; border: 1px solid var(--line); margin-top: 6px; }
 .ico.pdf { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
@@ -286,6 +304,7 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
       <div class="mode" role="tablist" aria-label="Studio">
         <button class="on" data-mode="music" role="tab">♪ Music studio</button>
         <button data-mode="video" role="tab">▶ Video studio</button>
+        <button data-mode="photo" role="tab">▣ Photo studio</button>
       </div>
       <span class="hint" id="modeHint">Songs from the library feed both studios.</span>
     </div>
@@ -370,6 +389,8 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         </div>
         <div class="field"><label class="f" for="poIntro">Spoken intro (optional)</label>
           <input type="text" id="poIntro" placeholder="This is Jarvis, with a late-night version of…"></div>
+        <div class="field"><label class="f" for="poCover">Cover picture for the video (optional)</label>
+          <input type="text" id="poCover" placeholder="pick one in the Photo studio, or a path"></div>
         <div class="field"><label class="check"><input type="checkbox" id="poVideo" checked> Render a video</label></div>
         <div class="actions"><button class="btn primary" data-run="produce">Start production</button><span class="hint" id="poEta">About 4–5× the song length on CPU.</span></div>
       </div>
@@ -412,23 +433,7 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         </div>
         <div class="actions" style="margin-bottom:6px"><button class="btn primary" data-run="make_music">Write the song</button><span class="hint" id="mmEta">About 2 min for 60 s, plus about 1 min to split.</span></div>
         <hr class="divider">
-        <div class="subhead">New picture</div>
-        <div class="row">
-          <div class="field" style="flex:2 1 260px"><label class="f" for="imPrompt">Describe the picture</label>
-            <input type="text" id="imPrompt" placeholder="album cover, lone guitarist on a rooftop at night, neon city, synthwave, purple and orange">
-            <div class="presets" id="imPresets"></div>
-            <div class="hint">Subject, setting, style, lighting, colours. Leave out words and titles: the model can't spell.</div></div>
-          <div class="field"><label class="f" for="imTitle">Title</label><input type="text" id="imTitle" placeholder="from the prompt"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label class="f" for="imSize">Shape</label>
-            <select id="imSize"><option value="512x512">Square 512 (cover) · ~20 s</option><option value="768x768">Square 768 · ~50 s</option>
-              <option value="768x512">Landscape 768×512 (thumbnail, video)</option><option value="512x768">Portrait 512×768 (poster, phone)</option></select></div>
-          <div class="field"><label class="f" for="imSeed">Seed</label><input type="number" id="imSeed" min="0" placeholder="random"></div>
-        </div>
-        <div class="actions" style="margin-bottom:6px"><button class="btn primary" data-run="make_image">Make the picture</button><span class="hint">Stable Diffusion (SD-Turbo) through Lemonade. Waits if a song is being made.</span></div>
-        <div id="imLast"></div>
-        <hr class="divider">
+        <div class="hint" style="margin:-4px 0 14px">Pictures are in the <a href="#" data-goto="photo">Photo studio</a>.</div>
         <div class="subhead">Speech</div>
         <div class="field"><label class="f" for="spText">Say this</label>
           <textarea id="spText" placeholder="Good evening. Tonight's set starts in five minutes."></textarea></div>
@@ -568,6 +573,54 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         </div>
         <div class="field"><label class="check"><input type="checkbox" id="caBurn" checked> Make a copy with captions burned in</label></div>
         <div class="actions"><button class="btn primary" data-run="v_captions">Make captions</button></div>
+      </div>
+    </section>
+
+    <section class="panel" id="photoPanel" hidden>
+      <nav class="tabs" role="tablist">
+        <button class="tab on" data-tab="p1" role="tab"><span class="num">1</span>Gallery</button>
+        <button class="tab" data-tab="p2" role="tab"><span class="num">2</span>Make a picture</button>
+        <button class="tab" data-tab="p3" role="tab"><span class="num">3</span>Add photos</button>
+      </nav>
+
+      <div class="pane on" id="pane-p1">
+        <div class="ph-bar">
+          <div class="seg" id="phFilter" data-value="all"><button data-v="all" class="on">All</button><button data-v="ai">AI pictures</button><button data-v="mine">My photos</button></div>
+          <input type="text" id="phSearch" placeholder="Search names and prompts" aria-label="Search photos">
+          <span class="hint" id="phCount"></span>
+          <button class="btn sm ghost" id="phOpenFolder">Open folder</button>
+        </div>
+        <div class="ph-detail" id="phDetail" hidden></div>
+        <div class="ph-grid" id="phGrid"></div>
+      </div>
+
+      <div class="pane" id="pane-p2">
+        <p class="pane-intro">Make a picture with Stable Diffusion (SD-Turbo) on this computer: covers, posters, thumbnails, stage backdrops and concept art. It lands in the gallery.</p>
+                <div class="row">
+          <div class="field" style="flex:2 1 260px"><label class="f" for="imPrompt">Describe the picture</label>
+            <input type="text" id="imPrompt" placeholder="album cover, lone guitarist on a rooftop at night, neon city, synthwave, purple and orange">
+            <div class="presets" id="imPresets"></div>
+            <div class="hint">Subject, setting, style, lighting, colours. Leave out words and titles: the model can't spell.</div></div>
+          <div class="field"><label class="f" for="imTitle">Title</label><input type="text" id="imTitle" placeholder="from the prompt"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="f" for="imSize">Shape</label>
+            <select id="imSize"><option value="512x512">Square 512 (cover) · ~20 s</option><option value="768x768">Square 768 · ~50 s</option>
+              <option value="768x512">Landscape 768×512 (thumbnail, video)</option><option value="512x768">Portrait 512×768 (poster, phone)</option></select></div>
+          <div class="field"><label class="f" for="imSeed">Seed</label><input type="number" id="imSeed" min="0" placeholder="random"></div>
+        </div>
+        <div class="actions" style="margin-bottom:6px"><button class="btn primary" data-run="make_image">Make the picture</button><span class="hint">Stable Diffusion (SD-Turbo) through Lemonade. Waits if a song is being made.</span></div>
+        <div id="imLast"></div>
+      </div>
+
+      <div class="pane" id="pane-p3">
+        <p class="pane-intro">Bring your own photos in for covers, music-video backgrounds, beat-cut edits and narrated slides. They're copied to <code>~/Music/Jarvis/images/my-photos</code>; the originals stay where they are.</p>
+        <label class="drop" id="phDrop" tabindex="0">
+          <input type="file" id="phFiles" accept="image/*" multiple hidden>
+          <b>Drop photos here</b><span>or click to choose files · PNG, JPG, WebP, GIF, BMP · up to 50 MB each</span>
+        </label>
+        <div class="field" style="margin-top:18px"><label class="f" for="phImport">Or copy from a file or folder on this computer</label>
+          <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="phImport" placeholder="~/Pictures/gig-2026"><button class="btn" id="phImportBtn">Copy in</button></div></div>
       </div>
     </section>
     <datalist id="videoList"></datalist>
@@ -768,13 +821,15 @@ $$(".tab").forEach(t => t.onclick = () => {
   panel.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === "pane-" + t.dataset.tab));
   try { localStorage.setItem("jarvis-tab-" + panel.id, t.dataset.tab); } catch {}
 });
-for (const id of ["musicPanel", "videoPanel"]) {
+for (const id of ["musicPanel", "videoPanel", "photoPanel"]) {
   try { const t = localStorage.getItem("jarvis-tab-" + id); if (t) $(`#${id} .tab[data-tab="${t}"]`)?.click(); } catch {}
 }
 /* music / video mode */
 function setMode(m) {
   $$(".mode button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
-  $("#musicPanel").hidden = m !== "music"; $("#videoPanel").hidden = m !== "video";
+  $("#musicPanel").hidden = m !== "music"; $("#videoPanel").hidden = m !== "video"; $("#photoPanel").hidden = m !== "photo";
+  $("#modeHint").textContent = m === "photo" ? "Pictures you make or add here become covers, backgrounds and slides." : "Songs from the library feed both studios.";
+  if (m === "photo") loadPhotos();
   try { localStorage.setItem("jarvis-mode", m); } catch {}
 }
 $$(".mode button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
@@ -812,7 +867,7 @@ const BUILDERS = {
     if (!needSong()) return;
     const style = $("#poStyle").value.trim(); if (!style) { toast("Describe a style first.", true); return; }
     const keep = stemsIn("#poKeep", "on"); if (!keep.length) { toast("Keep at least one part.", true); return; }
-    return { song: state.song.job_id, style, keep, strength: +$("#poStrength").value, intro: $("#poIntro").value.trim(), video: $("#poVideo").checked };
+    return { song: state.song.job_id, style, keep, strength: +$("#poStrength").value, intro: $("#poIntro").value.trim(), video: $("#poVideo").checked, cover_image: $("#poCover").value.trim() };
   },
   sheet() { if (!needSong()) return; return { song: state.song.job_id, parts: stemsIn("#shParts", "on") }; },
   make_image() {
@@ -889,6 +944,7 @@ async function loadJobs() {
     refresh = true;
     toast(`${j.label}: ${j.status}`, j.status === "failed");
     if (j.workflow === "split") loadSongs();
+    if (j.workflow === "make_image") loadPhotos();
     if (j.workflow === "make_image" && j.files?.length) showPicture(j.files.find(f => f.ext === ".png") || j.files[0]);
   }
   state.jobsLoaded = true;
@@ -1021,6 +1077,103 @@ $("#obsRec").onclick = () => {
 };
 $("#stopBtn").onclick = () => act("/api/stop", {});
 
+
+/* photo studio */
+state.photos = []; state.photo = null;
+async function loadPhotos() {
+  try { state.photos = await api("/api/photos"); } catch (e) { return toast(e.message, true); }
+  if (state.photo) state.photo = state.photos.find(p => p.path === state.photo.path) || null;
+  renderPhotos();
+}
+function renderPhotos() {
+  const f = $("#phFilter").dataset.value, q = $("#phSearch").value.toLowerCase();
+  const list = state.photos.filter(p => (f === "all" || p.source === f) &&
+    (!q || (p.name + " " + (p.notes.prompt || "")).toLowerCase().includes(q)));
+  $("#phCount").textContent = `${list.length} of ${state.photos.length}`;
+  $("#phGrid").replaceChildren(...(list.length ? list.map(p => el("button", {
+      class: "ph-card" + (state.photo?.path === p.path ? " sel" : ""), type: "button", title: p.notes.prompt || p.name,
+      onclick: () => { state.photo = p; renderPhotos(); $("#phDetail").scrollIntoView({ block: "nearest", behavior: "smooth" }); } },
+    el("img", { src: "/files/" + encodeURI(p.path) + "?t=" + Math.round(p.mtime), alt: p.name, loading: "lazy" }),
+    el("span", { text: p.name.replace(/\.[^.]+$/, "") }),
+    el("i", { class: "tag", text: p.source === "ai" ? "AI" : "PHOTO" }))) :
+    [el("div", { class: "empty", text: state.photos.length ? "No match." : "No pictures yet. Make one or add your photos." })]));
+  renderPhotoDetail();
+}
+function useIn(mode, tab, field, value, label) {
+  setMode(mode); $(`.tab[data-tab="${tab}"]`).click(); const i = $(field); i.value = value; i.focus();
+  toast(`Set as ${label}`);
+}
+function photoAction(action, extra = {}) {
+  return api("/api/photos/action", { path: state.photo.path, action, ...extra });
+}
+function renderPhotoDetail() {
+  const p = state.photo, box = $("#phDetail");
+  box.hidden = !p; if (!p) return box.replaceChildren();
+  const url = "/files/" + encodeURI(p.path);
+  const img = el("img", { src: url + "?t=" + Math.round(p.mtime), alt: p.name });
+  const dims = el("span", {});
+  img.onload = () => dims.textContent = `${img.naturalWidth}×${img.naturalHeight} · `;
+  const n = p.notes;
+  const btn = (text, fn, cls = "btn sm") => el("button", { class: cls, type: "button", text, onclick: fn });
+  const msg = pr => pr.then(r => { toast(r.message); return r; }).catch(e => toast(e.message, true));
+  const rename = el("input", { type: "text", value: p.name.replace(/\.[^.]+$/, ""), "aria-label": "Name" });
+  box.replaceChildren(
+    el("a", { href: url, target: "_blank", rel: "noopener", title: "Open full size" }, img),
+    el("div", {},
+      el("h3", { text: p.name }),
+      el("div", { class: "hint" }, dims, `${fmtSize(p.size)} · ${p.source === "ai" ? "made by AI" : "your photo"} · ${ago(p.mtime)}${p.album ? " · " + p.album : ""}`),
+      n.prompt ? el("div", { class: "prompt", text: n.prompt }) : null,
+      n.prompt ? el("div", { class: "hint", text: [n.model && "Model " + n.model, n.size, n.seed && "Seed " + n.seed].filter(Boolean).join(" · ") }) : null,
+      el("div", { class: "field", style: "margin:12px 0 0" }, el("label", { class: "f", text: "Name" }),
+        el("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, rename,
+          btn("Rename", () => msg(photoAction("rename", { name: rename.value })).then(r => { if (r?.path) { state.photo = { ...p, path: r.path }; loadPhotos(); } })))),
+      el("div", { class: "subhead", style: "margin-top:14px", text: "Edit" }),
+      el("div", { class: "btns" },
+        btn("Open full size", () => window.open(url, "_blank", "noopener")),
+        btn("Edit in GIMP", () => msg(photoAction("gimp"))),
+        btn("Edit in Krita", () => msg(photoAction("krita"))),
+        btn("Show in folder", () => msg(api("/api/open", { path: p.path }))),
+        n.prompt ? btn("Make variations", () => {
+          setMode("photo"); $('.tab[data-tab="p2"]').click();
+          $("#imPrompt").value = n.prompt; $("#imSeed").value = /^\d+$/.test(n.seed || "") ? n.seed : "";
+          $("#imTitle").value = (n.title || "") + " v2"; if (n.size && $(`#imSize option[value="${n.size}"]`)) $("#imSize").value = n.size;
+          toast(n.seed && /^\d+$/.test(n.seed) ? "Same seed: tweak the prompt to keep the layout." : "Tweak the prompt and make another.");
+        }) : null),
+      el("div", { class: "subhead", style: "margin-top:14px", text: "Use it" }),
+      el("div", { class: "btns" },
+        btn("Music video background", () => useIn("video", "v1", "#mvBg", p.abs, "music video background")),
+        btn("AI re-production cover", () => useIn("music", "produce", "#poCover", p.abs, "AI re-production cover")),
+        btn("Narrated slides (this folder)", () => useIn("video", "v5", "#nrImages", p.abs.replace(/\/[^/]+$/, ""), "narrated video slides folder")),
+        btn("Beat-cut edit (this folder)", () => useIn("video", "v3", "#edClips", p.abs.replace(/\/[^/]+$/, ""), "beat-cut photos folder"))),
+      el("div", { class: "btns", style: "margin-top:16px" },
+        btn("Move to Trash", () => { if (confirm(`Move ${p.name} to the Trash? You can restore it from the Trash.`)) msg(photoAction("trash")).then(() => { state.photo = null; loadPhotos(); }); }, "btn sm danger"),
+        btn("Close", () => { state.photo = null; renderPhotos(); }, "btn sm ghost"))));
+}
+$("#phFilter").addEventListener("change", renderPhotos);
+$("#phSearch").oninput = renderPhotos;
+$("#phOpenFolder").onclick = () => api("/api/open", { path: "music/images" }).then(r => toast(r.message)).catch(e => toast(e.message, true));
+async function uploadPhotos(files) {
+  files = [...files].filter(f => f.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name));
+  if (!files.length) return toast("Those aren't pictures.", true);
+  const fd = new FormData(); files.forEach(f => fd.append("files", f, f.name));
+  toast(`Adding ${files.length} photo${files.length > 1 ? "s" : ""}…`);
+  try {
+    const r = await fetch("/api/photos/upload", { method: "POST", headers: { "X-Jarvis": "1" }, body: fd });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText);
+    toast(j.message); await loadPhotos(); $('.tab[data-tab="p1"]').click(); $("#phFilter button[data-v=mine]").click();
+  } catch (e) { toast(e.message, true); }
+}
+const drop = $("#phDrop");
+$("#phFiles").onchange = e => { uploadPhotos(e.target.files); e.target.value = ""; };
+drop.onkeydown = e => (e.key === "Enter" || e.key === " ") && $("#phFiles").click();
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => uploadPhotos(e.dataTransfer.files));
+$("#phImportBtn").onclick = () => {
+  const path = $("#phImport").value.trim(); if (!path) return toast("Enter a file or folder path.", true);
+  api("/api/photos/import", { path }).then(r => { toast(r.message); $("#phImport").value = ""; loadPhotos(); $('.tab[data-tab="p1"]').click(); }).catch(e => toast(e.message, true));
+};
+$$("[data-goto]").forEach(a => a.onclick = e => { e.preventDefault(); setMode(a.dataset.goto); });
 /* polling */
 async function boot() {
   await Promise.all([loadStatus(), loadSongs(), loadOutputs(), loadActivity(), loadRigs()]);

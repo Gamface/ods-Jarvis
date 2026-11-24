@@ -416,6 +416,135 @@ async def api_open(request):
     return ok(message=f"Opened {target.name or target}")
 
 
+# --- photo studio ---------------------------------------------------------
+PHOTOS = OUT_ROOT / "images"          # AI pictures land here (studio_make_image)
+MY_PHOTOS = PHOTOS / "my-photos"      # photos you add by hand
+PHOTO_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+MAX_PHOTO = 50 * 1024 * 1024
+EDITORS = {"gimp": "gimp", "krita": "krita"}
+
+
+def _photo_notes(p: Path) -> dict:
+    """The .txt that studio_make_image writes beside each picture: Title/Prompt/Model/Seed."""
+    t = p.with_suffix(".txt")
+    info = {}
+    if t.is_file():
+        for line in t.read_text(errors="replace").splitlines():
+            for part in line.split("  "):
+                k, sep, v = part.partition(":")
+                if sep and k.strip() in ("Title", "Prompt", "Model", "Size", "Seed", "Made"):
+                    info[k.strip().lower()] = v.strip()
+    return info
+
+
+def list_photos() -> list[dict]:
+    if not PHOTOS.exists():
+        return []
+    out = []
+    for p in PHOTOS.rglob("*"):
+        if p.is_file() and p.suffix.lower() in PHOTO_EXT:
+            f = _file_info(p)
+            notes = _photo_notes(p)
+            f.update(notes=notes, source="ai" if notes.get("prompt") else "mine",
+                     album=str(p.parent.relative_to(PHOTOS)) if p.parent != PHOTOS else "")
+            out.append(f)
+    out.sort(key=lambda f: f["mtime"], reverse=True)
+    return out
+
+
+def _photo_path(rel: str) -> Path:
+    p = _safe_path(rel)
+    if not p.is_relative_to(PHOTOS.resolve()) or p.suffix.lower() not in PHOTO_EXT:
+        raise PermissionError("Only pictures in the photo studio")
+    return p
+
+
+def _clean_name(name: str) -> str:
+    stem, ext = os.path.splitext(Path(name).name)
+    stem = re.sub(r"[^\w .()-]+", "_", stem).strip(" .") or "photo"
+    return stem[:80] + ext.lower()
+
+
+def _store(name: str, data: bytes) -> Path:
+    if Path(name).suffix.lower() not in PHOTO_EXT:
+        raise ValueError(f"{name}: not a picture ({', '.join(sorted(PHOTO_EXT))})")
+    if len(data) > MAX_PHOTO:
+        raise ValueError(f"{name}: larger than 50 MB")
+    from studio.images import _unique
+    MY_PHOTOS.mkdir(parents=True, exist_ok=True)
+    dest = _unique(MY_PHOTOS / _clean_name(name))
+    dest.write_bytes(data)
+    return dest
+
+
+async def api_photos(request):
+    import anyio
+    return ok(await anyio.to_thread.run_sync(list_photos))
+
+
+async def api_photos_upload(request):
+    # Multipart, so no JSON check; the X-Jarvis header still blocks other websites.
+    if request.headers.get("x-jarvis") != "1":
+        raise PermissionError("missing X-Jarvis header")
+    form = await request.form(max_files=100, max_part_size=MAX_PHOTO)
+    saved, errors = [], []
+    for item in form.getlist("files"):
+        try:
+            saved.append(_store(item.filename or "photo.jpg", await item.read()).name)
+        except ValueError as e:
+            errors.append(str(e))
+    audit("photos_add", count=len(saved))
+    msg = f"Added {len(saved)} photo{'s' if len(saved) != 1 else ''}" + (f". Skipped: {'; '.join(errors)}" if errors else "")
+    return ok(message=msg, saved=saved)
+
+
+async def api_photos_import(request):
+    data = await body(request)
+    src = Path(str(data.get("path", ""))).expanduser()
+    if not src.exists():
+        raise FileNotFoundError(f"Not found: {src}")
+    files = [src] if src.is_file() else sorted(p for p in src.iterdir() if p.is_file() and p.suffix.lower() in PHOTO_EXT)
+    if not files:
+        raise ValueError("No pictures there")
+    saved, errors = [], []
+    for f in files[:500]:
+        try:
+            saved.append(_store(f.name, f.read_bytes()).name)
+        except ValueError as e:
+            errors.append(str(e))
+    audit("photos_add", source=str(src), count=len(saved))
+    return ok(message=f"Copied {len(saved)} photo{'s' if len(saved) != 1 else ''} into the photo studio"
+              + (f". Skipped: {'; '.join(errors[:5])}" if errors else ""))
+
+
+async def api_photos_action(request):
+    data = await body(request)
+    p = _photo_path(data.get("path", ""))
+    action = data.get("action")
+    audit("photo_" + str(action), path=data.get("path"))
+    if action in EDITORS:
+        if not shutil.which(EDITORS[action]):
+            raise RuntimeError(f"{action} is not installed")
+        subprocess.Popen([EDITORS[action], str(p)], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return ok(message=f"Opening {p.name} in {action.title()}")
+    if action == "trash":  # recoverable from the desktop's Trash
+        for f in (p, p.with_suffix(".txt")):
+            if f.exists():
+                subprocess.run(["gio", "trash", str(f)], check=True, capture_output=True)
+        return ok(message=f"Moved {p.name} to the Trash")
+    if action == "rename":
+        new = _clean_name(str(data.get("name", "")).strip() + p.suffix)
+        dest = p.with_name(new)
+        if dest.exists():
+            raise ValueError(f"{new} already exists")
+        p.rename(dest)
+        if p.with_suffix(".txt").exists():
+            p.with_suffix(".txt").rename(dest.with_suffix(".txt"))
+        return ok(message=f"Renamed to {dest.name}", path=_file_info(dest)["path"])
+    raise ValueError(f"Unknown photo action '{action}'")
+
+
 async def api_guitarix(request):
     import anyio
     if request.method == "GET":
@@ -513,13 +642,17 @@ routes = [
     Route("/api/guitarix", api_guitarix, methods=["GET", "POST"]),
     Route("/api/obs", api_obs, methods=["GET", "POST"]),
     Route("/api/outputs", api_outputs),
+    Route("/api/photos", api_photos),
+    Route("/api/photos/upload", api_photos_upload, methods=["POST"]),
+    Route("/api/photos/import", api_photos_import, methods=["POST"]),
+    Route("/api/photos/action", api_photos_action, methods=["POST"]),
     Route("/api/activity", api_activity),
     Route("/files/{path:path}", files),
     Route("/health", lambda r: Response('{"status":"ok"}', media_type="application/json")),
 ]
 app = Starlette(routes=routes, exception_handlers={
     e: on_error for e in (ValueError, KeyError, RuntimeError, PermissionError, FileNotFoundError,
-                          OSError, httpx.HTTPError)})
+                          OSError, httpx.HTTPError, subprocess.SubprocessError)})
 
 if __name__ == "__main__":
     uvicorn.run(HostGuard(app), host=BIND, port=PORT, log_level="warning")

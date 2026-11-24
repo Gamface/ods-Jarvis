@@ -58,6 +58,7 @@ Open **http://127.0.0.1:7722**, or **Jarvis Studio** in the app menu. It runs as
 - **Jobs**: workflows run in the background (two at a time) with results and file buttons.
 - **Outputs**: recent files in `~/Music/Jarvis` and `~/Videos/Jarvis`. Preview audio, watch videos in a pop-up player, play on the computer speakers, open PDFs, thumbnails and timelines, or show in the folder.
 - **Activity**: the shared audit log, so you see what Hermes did as well as the dashboard.
+- **Photo studio** (the third mode, beside Music and Video): a gallery of AI pictures and your own photos in `~/Music/Jarvis/images`, with search and filters. **Make a picture** runs `studio_make_image` (SD-Turbo via Lemonade). **Add photos** takes drag-and-drop uploads or copies a file or folder into `images/my-photos`. Pick a picture to rename it, open it in GIMP or Krita, make variations from its prompt and seed, use it as a music-video background, AI re-production cover, narrated slides or beat-cut folder, or move it to the Trash.
 
 Requests must come from `localhost`, and every action needs a JSON body with an `X-Jarvis` header, so other websites can't drive it from your browser.
 
