@@ -163,6 +163,19 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .ico { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; font-size: 10px; font-weight: 700; font-family: var(--mono); background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line); text-transform: uppercase; }
 .ico.wav, .ico.mp3, .ico.flac { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .ico.mp4 { background: var(--solo-soft); color: var(--solo); border-color: transparent; }
+.mx-transport { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.mx-transport input[type=range] { flex: 1 1 200px; width: auto; }
+.mx-rows { display: grid; gap: 4px; }
+.mx-row { display: grid; grid-template-columns: 92px 64px minmax(80px, 1fr) 42px; gap: 10px; align-items: center; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.mx-row.off { opacity: .5; }
+.mx-row b { font-size: 13px; text-transform: capitalize; display: flex; align-items: center; gap: 6px; }
+.mx-row b i { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); flex: none; }
+.mx-row .ms { display: flex; gap: 4px; }
+.mx-row .ms button { width: 28px; height: 26px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--panel); font-weight: 700; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.mx-row .ms button.m.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+.mx-row .ms button.s.on { background: var(--solo); border-color: var(--solo); color: #fff; }
+.mx-row .pct { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--ink-2); }
+.mx-row .pres { font-size: 10.5px; color: var(--ink-3); font-weight: 500; }
 .ph-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .ph-bar input { flex: 1 1 200px; width: auto; }
 .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -312,14 +325,37 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
     <section class="panel" id="musicPanel">
       <nav class="tabs" role="tablist">
         <button class="tab on" data-tab="create" role="tab"><span class="num">+</span>Create</button>
-        <button class="tab" data-tab="practice" role="tab"><span class="num">1</span>Practice</button>
+        <button class="tab" data-tab="stems" role="tab"><span class="num">1</span>Stems</button>
         <button class="tab" data-tab="daw" role="tab"><span class="num">2</span>DAW</button>
-        <button class="tab" data-tab="karaoke" role="tab"><span class="num">3</span>Karaoke</button>
-        <button class="tab" data-tab="produce" role="tab"><span class="num">4</span>AI remix</button>
-        <button class="tab" data-tab="sheet" role="tab"><span class="num">5</span>Sheet</button>
+        <button class="tab" data-tab="produce" role="tab"><span class="num">3</span>AI remix</button>
+        <button class="tab" data-tab="practice" role="tab"><span class="num">4</span>Practice</button>
+        <button class="tab" data-tab="karaoke" role="tab"><span class="num">5</span>Karaoke</button>
+        <button class="tab" data-tab="sheet" role="tab"><span class="num">6</span>Sheet</button>
       </nav>
 
-      <!-- 1 practice -->
+      <!-- stems -->
+      <div class="pane" id="pane-stems">
+        <p class="pane-intro">Listen to the selected song's parts together. Mute or solo them, set each level, then save the mix or the stems themselves.</p>
+        <div class="mx-transport">
+          <button class="btn primary" id="mxPlay" type="button">▶ Play</button>
+          <span class="val" id="mxTime">0:00 / 0:00</span>
+          <input type="range" id="mxSeek" min="0" max="1000" value="0" aria-label="Position">
+          <button class="btn sm ghost" id="mxReset" type="button">Reset levels</button>
+        </div>
+        <div class="mx-rows" id="mxRows"><div class="empty">Pick a song from the library.</div></div>
+        <div class="row" style="margin-top:14px">
+          <div class="field"><label class="f" for="mxKey">Key change for the saved mix <span class="val" id="mxKeyV">0 st</span></label>
+            <input type="range" id="mxKey" min="-6" max="6" step="1" value="0"></div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-run="stems_mix">Save this mix</button>
+          <button class="btn" data-run="stems_export">Export stems as WAV</button>
+          <button class="btn ghost" id="mxStemDeck" type="button">Open in StemDeck</button>
+          <span class="hint">Saved to ~/Music/Jarvis/mixes and ~/Music/Jarvis/stems.</span>
+        </div>
+      </div>
+
+      <!-- practice -->
       <div class="pane" id="pane-practice">
         <p class="pane-intro">Build a practice track from the stems. Click a part to mute it, click again to solo it.</p>
         <div class="field"><label class="f">Parts</label><div class="stems" id="prStems" data-mode="mute"></div></div>
@@ -712,6 +748,7 @@ try { const t = localStorage.getItem("jarvis-theme"); if (t) document.documentEl
 async function loadStatus() {
   try {
     const s = await api("/api/status");
+    state.stemdeck = (s.services.find(x => x.id === "stemdeck") || {}).url || "http://127.0.0.1:8000";
     const chips = s.services.map(x => {
       const cls = x.ok ? "ok" : (x.idle_ok || x.ok === null ? "" : "bad");
       const inner = [el("span", { class: "dot" }), x.label];
@@ -765,6 +802,7 @@ function renderSong() {
       el("div", { class: "bar" }, el("i", { style: `height:${pres[n] ?? 0}%` })),
       el("div", { class: "n" }, el("span", { text: n }), el("span", { text: pres[n] != null ? pres[n] + "%" : "" }))))),
   );
+  buildMixer(s);
   buildStemToggles("#prStems", stems, "on");
   buildStemToggles("#poKeep", stems, n => n === "vocals" ? "on" : "off");
   buildStemToggles("#shParts", stems.filter(n => n !== "drums"), "off");
@@ -870,6 +908,16 @@ const BUILDERS = {
     return { song: state.song.job_id, style, keep, strength: +$("#poStrength").value, intro: $("#poIntro").value.trim(), video: $("#poVideo").checked, cover_image: $("#poCover").value.trim() };
   },
   sheet() { if (!needSong()) return; return { song: state.song.job_id, parts: stemsIn("#shParts", "on") }; },
+  stems_mix() {
+    if (!needSong()) return;
+    const gains = mixGains(); if (!Object.values(gains).some(g => g > 0)) { toast("Every part is muted.", true); return; }
+    return { song: state.song.job_id, gains, semitones: +$("#mxKey").value };
+  },
+  stems_export() {
+    if (!needSong()) return;
+    const on = Object.entries(mixGains()).filter(([, g]) => g > 0).map(([n]) => n);
+    return { song: state.song.job_id, parts: on.length && on.length < state.mixer.length ? on : [] };
+  },
   make_image() {
     const p = $("#imPrompt").value.trim(); if (!p) { toast("Describe the picture first.", true); return; }
     return { prompt: p, title: $("#imTitle").value.trim(), size: $("#imSize").value, seed: $("#imSeed").value };
@@ -1003,7 +1051,7 @@ function preview(f) {
   a.src = "/files/" + encodeURI(f.path); a.play().catch(() => {});
   $("#nowName").textContent = f.name; $("#nowSub").textContent = f.song || f.kind || "";
 }
-const KINDS = { all: "All", songs: "Songs", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech", images: "Pictures",
+const KINDS = { all: "All", songs: "Songs", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech", mixes: "Mixes", images: "Pictures",
   "music-videos": "Music videos", performances: "Performances", edits: "Edits", shorts: "Shorts", narrated: "Narrated", captions: "Captions" };
 const VIDEO_KINDS = new Set(["music-videos", "performances", "edits", "shorts", "narrated", "captions"]);
 async function loadOutputs() {
@@ -1078,6 +1126,70 @@ $("#obsRec").onclick = () => {
 $("#stopBtn").onclick = () => act("/api/stop", {});
 
 
+
+/* stem mixer */
+state.mixer = []; state.mxPlaying = false;
+function fmtClock(t) { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`; }
+function mixGains() {
+  const solo = state.mixer.some(m => m.solo);
+  return Object.fromEntries(state.mixer.map(m => [m.name, m.mute || (solo && !m.solo) ? 0 : +(m.vol / 100).toFixed(2)]));
+}
+function applyMix() {
+  const g = mixGains();
+  state.mixer.forEach(m => { m.audio.volume = Math.min(1, g[m.name]); m.row.classList.toggle("off", g[m.name] === 0);
+    m.row.querySelector(".m").classList.toggle("on", m.mute); m.row.querySelector(".s").classList.toggle("on", m.solo);
+    m.row.querySelector(".pct").textContent = m.vol + "%"; });
+}
+function mxPause() {
+  state.mxPlaying = false; state.mixer.forEach(m => m.audio.pause()); $("#mxPlay").textContent = "▶ Play";
+}
+function buildMixer(s) {
+  if (state.mxSong === s.job_id && state.mixer.length) return;
+  mxPause(); state.mixer.forEach(m => { m.audio.removeAttribute("src"); m.audio.load(); });
+  state.mxSong = s.job_id; state.mixer = [];
+  const base = state.stemdeck || "http://127.0.0.1:8000", pres = s.stem_presence || {};
+  const rows = (s.stems || []).map(st => {
+    const audio = new Audio(); audio.preload = "auto"; audio.src = base + st.url;
+    const m = { name: st.name, audio, vol: 100, mute: false, solo: false };
+    const vol = el("input", { type: "range", min: 0, max: 100, value: 100, "aria-label": st.name + " level" });
+    vol.oninput = () => { m.vol = +vol.value; applyMix(); };
+    m.row = el("div", { class: "mx-row" },
+      el("b", {}, el("i"), st.name, pres[st.name] != null ? el("span", { class: "pres", text: pres[st.name] + "%" }) : null),
+      el("div", { class: "ms" },
+        el("button", { class: "m", type: "button", title: "Mute", text: "M", onclick: () => { m.mute = !m.mute; applyMix(); } }),
+        el("button", { class: "s", type: "button", title: "Solo", text: "S", onclick: () => { m.solo = !m.solo; applyMix(); } })),
+      vol, el("span", { class: "pct", text: "100%" }));
+    m.vol_el = vol; state.mixer.push(m); return m.row;
+  });
+  $("#mxRows").replaceChildren(...(rows.length ? rows : [el("div", { class: "empty", text: "This song has no stems yet." })]));
+  if (state.mixer[0]) state.mixer[0].audio.addEventListener("loadedmetadata", mxTick);
+  applyMix(); mxTick();
+}
+function mxTick() {
+  const lead = state.mixer[0]?.audio; if (!lead) return;
+  const d = lead.duration || state.song?.duration || 0;
+  $("#mxTime").textContent = `${fmtClock(lead.currentTime)} / ${fmtClock(d)}`;
+  if (document.activeElement !== $("#mxSeek")) $("#mxSeek").value = d ? Math.round(lead.currentTime / d * 1000) : 0;
+  if (state.mxPlaying) {
+    state.mixer.slice(1).forEach(m => { if (Math.abs(m.audio.currentTime - lead.currentTime) > 0.06) m.audio.currentTime = lead.currentTime; });
+    if (lead.ended) { mxPause(); state.mixer.forEach(m => m.audio.currentTime = 0); }
+  }
+}
+setInterval(mxTick, 250);
+$("#mxPlay").onclick = async () => {
+  if (!state.mixer.length) return toast("Pick a song first.", true);
+  if (state.mxPlaying) return mxPause();
+  $("#audio").pause();
+  const t = state.mixer[0].audio.currentTime;
+  state.mixer.forEach(m => m.audio.currentTime = t);
+  try { await Promise.all(state.mixer.map(m => m.audio.play())); state.mxPlaying = true; $("#mxPlay").textContent = "❚❚ Pause"; }
+  catch (e) { mxPause(); toast("Couldn't play the stems: " + e.message, true); }
+};
+$("#mxSeek").oninput = e => { const d = state.mixer[0]?.audio.duration || 0; state.mixer.forEach(m => m.audio.currentTime = d * e.target.value / 1000); mxTick(); };
+$("#mxReset").onclick = () => { state.mixer.forEach(m => { m.vol = 100; m.mute = m.solo = false; m.vol_el.value = 100; }); $("#mxKey").value = 0; $("#mxKey").dispatchEvent(new Event("input")); applyMix(); };
+$("#mxStemDeck").onclick = () => window.open(state.stemdeck || "http://127.0.0.1:8000", "_blank", "noopener");
+bindVal("#mxKey", "#mxKeyV", v => (v > 0 ? "+" : "") + v + " st");
+$("#audio").addEventListener("play", () => state.mxPlaying && mxPause());
 /* photo studio */
 state.photos = []; state.photo = null;
 async function loadPhotos() {

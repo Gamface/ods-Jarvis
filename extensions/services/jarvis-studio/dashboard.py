@@ -35,7 +35,7 @@ from studio import stemdeck as sd
 from studio import workflows as wf
 from studio.video import workflows as vwf
 from studio.video.common import VIDEO_OUT, vaapi_ok
-from studio.config import (ACESTEP_DIR, BASIC_PITCH, MOSS_DIR, OUT_ROOT, STEMDECK_URL,
+from studio.config import (safe_name, ACESTEP_DIR, BASIC_PITCH, MOSS_DIR, OUT_ROOT, STEMDECK_URL,
                            out_dir)
 
 HERE = Path(__file__).resolve().parent
@@ -101,6 +101,29 @@ def _make_image(a):
                              a.get("model") or None, _num(a.get("seed"), int))
 
 
+def _stems_export(a):
+    job = sd.ensure_song(a["song"])
+    names = _csv(a.get("parts")) or sd.stem_names(job)
+    d = out_dir("stems", safe_name(job.get("title") or job["job_id"]))
+    got = sd.download_stems(job, d, names)
+    return f"Stems for '{job['title']}' in {d}:\n" + "\n".join(str(p) for p in got.values())
+
+
+def _stems_mix(a):
+    job = sd.ensure_song(a["song"])
+    names = sd.stem_names(job)
+    raw = a.get("gains") or {}
+    gains = {n: max(0.0, min(2.0, float(raw.get(n, 1.0)))) for n in names}
+    semis = _num(a.get("semitones"), int, 0)
+    if all(g == 0 for g in gains.values()):
+        raise ValueError("Every part is muted")
+    d = out_dir("mixes", safe_name(job.get("title") or job["job_id"]))
+    tag = "mix-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + (f"-{semis:+d}st" if semis else "")
+    path = sd.render_mix(job, d / f"{tag}.wav", gains, semis)
+    levels = ", ".join(f"{n} {int(round(g * 100))}%" for n, g in gains.items())
+    return f"Mix of '{job['title']}' ({levels}): {path}"
+
+
 def _split(a):
     job = sd.wait(sd.submit(a["source"]))
     return (f"Split '{job['title']}' ({job.get('key')}, {job.get('bpm')} BPM). "
@@ -121,6 +144,8 @@ WORKFLOWS = {
     "produce": ("AI re-production", lambda a: wf.ai_produce(
         a["song"], a["style"], _csv(a.get("keep")), _num(a.get("strength"), float, 0.45),
         a.get("intro") or None, None, a.get("cover_image") or None, bool(a.get("video", True)))),
+    "stems_export": ("Export stems", _stems_export),
+    "stems_mix": ("Stem mix", _stems_mix),
     "sheet": ("Sheet music", lambda a: wf.sheet_music(a["song"], _csv(a.get("parts")))),
     "make_music": ("New song", _make_music),
     "speak": ("Speak", _speak),
