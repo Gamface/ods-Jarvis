@@ -163,7 +163,8 @@ def studio_make_image(prompt: str, title: str | None = None, size: str = "512x51
     Stable Diffusion through Lemonade. prompt: subject, style, mood, colours, e.g.
     'album cover, snowy mountain town at dusk, warm lights, cinematic'. size: 512x512
     (default), 768x512, 512x768 or 768x768. model: SD-Turbo (default, fast) or SDXL-Turbo
-    if downloaded. Takes about 35 s on CPU. Saved to ~/Music/Jarvis/images and shown in
+    if downloaded. Takes about 20 s at 512x512 (about 50 s at 768x768) on the Intel
+    graphics via Vulkan. Saved to ~/Music/Jarvis/images and shown in
     the dashboard's Studio box. Waits if a song is being made."""
     from studio import images
     return images.make_image(prompt, title, size, model, seed)
