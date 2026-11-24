@@ -53,7 +53,7 @@ Open **http://127.0.0.1:7722**, or **Jarvis Studio** in the app menu. It runs as
 
 - **Status bar**: StemDeck, the Hermes MCP server, the Hermes container, Lemonade, Guitarix, OBS, Audacity, Ardour, playback, AI models and free disk space.
 - **Library**: every song in StemDeck with key, BPM and length. Pick one to see how present each part is. **Add a song** splits a file or link.
-- **Music studio / Video studio** switch: forms for the five music workflows plus **Create** (ACE-Step music, MOSS-TTS speech), and the five video workflows plus **Captions**. Click a part to mute it, again to solo it.
+- **Music / Video / Photo studio** switch. Music studio tabs, in order: **Create** (ACE-Step songs, MOSS-TTS speech), **Stems** (a mixer for the selected song: play every part in sync, mute/solo, set levels, save the mix to `~/Music/Jarvis/mixes` or export WAV stems to `~/Music/Jarvis/stems`), **DAW**, **AI remix**, **Practice**, **Karaoke** and **Sheet**. Video studio has the five video workflows plus **Captions**. Click a part to mute it, again to solo it.
 - **Rigs**: open Guitarix and switch presets; open OBS, change scene, start or stop recording (asks first).
 - **Jobs**: workflows run in the background (two at a time) with results and file buttons.
 - **Outputs**: recent files in `~/Music/Jarvis` and `~/Videos/Jarvis`. Preview audio, watch videos in a pop-up player, play on the computer speakers, open PDFs, thumbnails and timelines, or show in the folder.
