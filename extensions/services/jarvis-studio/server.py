@@ -171,6 +171,19 @@ def studio_make_image(prompt: str, title: str | None = None, size: str = "512x51
 
 
 @mcp.tool()
+@guarded("make_sfx")
+def studio_make_sfx(prompt: str, title: str | None = None, duration: float = 5,
+                    seed: int | None = None) -> str:
+    """Make a sound effect from a description, on this computer (ThinkSound through Lemonade):
+    e.g. 'heavy wooden door creaking open in a stone hall', 'crowd applause in a small
+    theatre', 'rain on a tin roof with distant thunder'. Good for stage plays, videos and
+    podcasts. duration: 1-30 seconds (default 5). Saved as WAV to ~/Music/Jarvis/sfx and shown
+    in the dashboard's Studio box. Waits if a song or picture is being made."""
+    from studio import sfx
+    return sfx.make_sfx(prompt, title, duration, seed)
+
+
+@mcp.tool()
 @guarded("speak")
 def studio_speak(text: str, voice_wav: str | None = None, play: bool = True) -> str:
     """Say text with MOSS-TTS-Nano (optionally cloning the voice in voice_wav)."""
