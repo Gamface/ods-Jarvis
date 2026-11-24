@@ -163,6 +163,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .ico { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; font-size: 10px; font-weight: 700; font-family: var(--mono); background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line); text-transform: uppercase; }
 .ico.wav, .ico.mp3, .ico.flac { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .ico.mp4 { background: var(--solo-soft); color: var(--solo); border-color: transparent; }
+.thumb { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; border: 1px solid var(--line); }
+.pic { display: block; max-width: min(100%, 384px); border-radius: 10px; border: 1px solid var(--line); margin-top: 6px; }
 .ico.pdf { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .file .nm { font-weight: 550; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file .ds { font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -409,6 +411,23 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
           <label class="check"><input type="checkbox" id="mmPlay"> Play on speakers when done</label>
         </div>
         <div class="actions" style="margin-bottom:6px"><button class="btn primary" data-run="make_music">Write the song</button><span class="hint" id="mmEta">About 2 min for 60 s, plus about 1 min to split.</span></div>
+        <hr class="divider">
+        <div class="subhead">New picture</div>
+        <div class="row">
+          <div class="field" style="flex:2 1 260px"><label class="f" for="imPrompt">Describe the picture</label>
+            <input type="text" id="imPrompt" placeholder="album cover, lone guitarist on a rooftop at night, neon city, synthwave, purple and orange">
+            <div class="presets" id="imPresets"></div>
+            <div class="hint">Subject, setting, style, lighting, colours. Leave out words and titles: the model can't spell.</div></div>
+          <div class="field"><label class="f" for="imTitle">Title</label><input type="text" id="imTitle" placeholder="from the prompt"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="f" for="imSize">Shape</label>
+            <select id="imSize"><option value="512x512">Square 512 (cover) · ~20 s</option><option value="768x768">Square 768 · ~50 s</option>
+              <option value="768x512">Landscape 768×512 (thumbnail, video)</option><option value="512x768">Portrait 512×768 (poster, phone)</option></select></div>
+          <div class="field"><label class="f" for="imSeed">Seed</label><input type="number" id="imSeed" min="0" placeholder="random"></div>
+        </div>
+        <div class="actions" style="margin-bottom:6px"><button class="btn primary" data-run="make_image">Make the picture</button><span class="hint">Stable Diffusion (SD-Turbo) through Lemonade. Waits if a song is being made.</span></div>
+        <div id="imLast"></div>
         <hr class="divider">
         <div class="subhead">Speech</div>
         <div class="field"><label class="f" for="spText">Say this</label>
@@ -796,6 +815,10 @@ const BUILDERS = {
     return { song: state.song.job_id, style, keep, strength: +$("#poStrength").value, intro: $("#poIntro").value.trim(), video: $("#poVideo").checked };
   },
   sheet() { if (!needSong()) return; return { song: state.song.job_id, parts: stemsIn("#shParts", "on") }; },
+  make_image() {
+    const p = $("#imPrompt").value.trim(); if (!p) { toast("Describe the picture first.", true); return; }
+    return { prompt: p, title: $("#imTitle").value.trim(), size: $("#imSize").value, seed: $("#imSeed").value };
+  },
   make_music() {
     const c = $("#mmCaption").value.trim(); if (!c) { toast("Describe the song first.", true); return; }
     return { caption: c, title: $("#mmTitle").value.trim(), lyrics: $("#mmLyrics").value.trim(), duration: +$("#mmDur").value,
@@ -866,6 +889,7 @@ async function loadJobs() {
     refresh = true;
     toast(`${j.label}: ${j.status}`, j.status === "failed");
     if (j.workflow === "split") loadSongs();
+    if (j.workflow === "make_image" && j.files?.length) showPicture(j.files.find(f => f.ext === ".png") || j.files[0]);
   }
   state.jobsLoaded = true;
   if (refresh) { loadOutputs(); loadActivity(); }
@@ -885,6 +909,13 @@ function renderJob(j) {
 }
 
 /* outputs */
+const IMG_PRESETS = ["album cover, ", "gig poster, ", "video thumbnail, ", "stage backdrop, ", "concept art, "];
+$("#imPresets").replaceChildren(...IMG_PRESETS.map(p => el("button", { class: "btn sm", type: "button", text: p.replace(", ", ""),
+  onclick: () => { const i = $("#imPrompt"); if (!i.value.startsWith(p)) i.value = p + i.value.replace(/^(album cover|gig poster|video thumbnail|stage backdrop|concept art), /, ""); i.focus(); } })));
+function showPicture(f) {
+  $("#imLast").replaceChildren(el("a", { href: "/files/" + encodeURI(f.path), target: "_blank", rel: "noopener", title: f.name },
+    el("img", { src: "/files/" + encodeURI(f.path) + "?t=" + Math.round(f.mtime), alt: f.name, class: "pic" })));
+}
 function fileRow(f) {
   const audioExt = [".wav", ".mp3", ".flac"].includes(f.ext);
   const acts = [];
@@ -894,8 +925,11 @@ function fileRow(f) {
   if ([".pdf", ".mp4", ".lrc", ".txt", ".png", ".srt"].includes(f.ext)) acts.push(iconBtn("open", "Open in new tab", () => window.open("/files/" + encodeURI(f.path), "_blank", "noopener")));
   if ([".aup3", ".ardour", ".mid", ".otio"].includes(f.ext)) acts.push(iconBtn("open", "Open in its app", () => api("/api/open", { path: f.path, file: true }).then(r => toast(r.message)).catch(e => toast(e.message, true))));
   acts.push(iconBtn("folder", "Show in folder", () => api("/api/open", { path: f.path }).then(r => toast(r.message)).catch(e => toast(e.message, true))));
+  const isPic = [".png", ".jpg"].includes(f.ext) && f.kind === "images";
+  if (isPic) acts.unshift(iconBtn("play", "Show here", () => showPicture(f)));
   return el("div", { class: "file" },
-    el("div", { class: "ico " + f.ext.slice(1), text: f.ext.slice(1, 4) }),
+    isPic ? el("img", { class: "thumb", src: "/files/" + encodeURI(f.path), alt: "", loading: "lazy" })
+          : el("div", { class: "ico " + f.ext.slice(1), text: f.ext.slice(1, 4) }),
     el("div", { style: "min-width:0" }, el("div", { class: "nm", text: f.name, title: f.path }),
       el("div", { class: "ds", text: [f.song || f.kind, fmtSize(f.size), ago(f.mtime)].filter(Boolean).join(" · ") })),
     el("div", { class: "acts" }, ...acts));
@@ -913,7 +947,7 @@ function preview(f) {
   a.src = "/files/" + encodeURI(f.path); a.play().catch(() => {});
   $("#nowName").textContent = f.name; $("#nowSub").textContent = f.song || f.kind || "";
 }
-const KINDS = { all: "All", songs: "Songs", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech",
+const KINDS = { all: "All", songs: "Songs", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech", images: "Pictures",
   "music-videos": "Music videos", performances: "Performances", edits: "Edits", shorts: "Shorts", narrated: "Narrated", captions: "Captions" };
 const VIDEO_KINDS = new Set(["music-videos", "performances", "edits", "shorts", "narrated", "captions"]);
 async function loadOutputs() {

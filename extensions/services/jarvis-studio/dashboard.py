@@ -46,7 +46,7 @@ MCP_HEALTH = (f"http://{os.environ.get('JARVIS_STUDIO_BIND', '127.0.0.1')}:"
 LEMONADE = os.environ.get("JARVIS_LEMONADE_URL", "http://127.0.0.1:13305")
 AUDIT = Path(os.environ.get("JARVIS_AUDIT_LOG", "~/ods/data/jarvis-studio/audit.log")).expanduser()
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}", f"[::1]:{PORT}"}
-SHOW_EXT = {".wav", ".mp3", ".flac", ".mp4", ".pdf", ".mid", ".lrc", ".txt", ".aup3", ".ardour"}
+SHOW_EXT = {".png", ".jpg", ".wav", ".mp3", ".flac", ".mp4", ".pdf", ".mid", ".lrc", ".txt", ".aup3", ".ardour"}
 
 
 def audit(event: str, **fields) -> None:
@@ -95,6 +95,12 @@ def _speak(a):
     return msg
 
 
+def _make_image(a):
+    from studio import images
+    return images.make_image(a.get("prompt", ""), a.get("title") or None, a.get("size") or "512x512",
+                             a.get("model") or None, _num(a.get("seed"), int))
+
+
 def _split(a):
     job = sd.wait(sd.submit(a["source"]))
     return (f"Split '{job['title']}' ({job.get('key')}, {job.get('bpm')} BPM). "
@@ -118,6 +124,7 @@ WORKFLOWS = {
     "sheet": ("Sheet music", lambda a: wf.sheet_music(a["song"], _csv(a.get("parts")))),
     "make_music": ("New song", _make_music),
     "speak": ("Speak", _speak),
+    "make_image": ("New picture", _make_image),
     # Video studio
     "v_music_video": ("Music video", lambda a: vwf.music_video(
         a["song"], a.get("style") or "stems", a.get("aspect") or "16:9", a.get("title") or None,
@@ -215,6 +222,22 @@ def _playing() -> bool:
         return False
 
 
+def _pictures() -> dict:
+    """Text-to-image: SD-Turbo in Lemonade. It loads only while a picture is being made."""
+    from studio import images
+    try:
+        models = httpx.get(f"{LEMONADE}/api/v1/models", params={"show_all": "true"}, timeout=3).json()["data"]
+        loaded = httpx.get(f"{LEMONADE}/api/v1/health", timeout=3).json().get("all_models_loaded", [])
+    except Exception:
+        return {"ok": False, "detail": "Lemonade not answering"}
+    have = {m["id"] for m in models if m.get("downloaded")}
+    model = images.DEFAULT_MODEL
+    if model not in have:
+        return {"ok": False, "detail": f"{model} not downloaded in Lemonade"}
+    busy = any(m.get("model_name") == model for m in loaded)
+    return {"ok": True, "detail": f"{model}: {'making a picture' if busy else 'ready, loads on demand'}"}
+
+
 def _lemonade() -> dict:
     try:
         r = httpx.get(f"{LEMONADE}/api/v1/health", timeout=2).json()
@@ -229,6 +252,7 @@ CHECKS = {
     "mcp": ("Jarvis Studio MCP", lambda: {"ok": _http_ok(MCP_HEALTH), "detail": "for Hermes"}),
     "hermes": ("Hermes agent", lambda: {"ok": _docker_up("ods-hermes"), "detail": "ods-hermes"}),
     "lemonade": ("Lemonade", lambda: {**_lemonade(), "url": LEMONADE}),
+    "pictures": ("Pictures", _pictures),
     "guitarix": ("Guitarix", lambda: {"ok": guitarix.running(), "detail": "amp sim", "idle_ok": True}),
     "obs": ("OBS", lambda: {"ok": obs.running(), "detail": "recorder", "idle_ok": True}),
     "audacity": ("Audacity", lambda: {"ok": _pgrep("^(/usr/bin/)?audacity"), "detail": "editor", "idle_ok": True}),
@@ -294,6 +318,10 @@ def recent_outputs(limit: int = 100) -> list[dict]:
             if "/acestep/" in str(p) or "/stems/" in str(p) or "/midi/" in str(p):
                 if p.suffix.lower() != ".mid":
                     continue
+            if p.suffix.lower() in (".png", ".jpg") and "/images/" not in str(p):
+                continue  # only finished pictures, not frames or artwork inside other jobs
+            if p.suffix.lower() == ".txt" and "/images/" in str(p):
+                continue  # prompt notes beside each picture
             if p.is_file() and p.suffix.lower() in SHOW_EXT and not p.name.endswith(".raw.wav"):
                 files.append(p)
     if VIDEO_OUT.exists():
