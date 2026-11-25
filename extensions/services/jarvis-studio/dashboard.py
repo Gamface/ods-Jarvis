@@ -437,7 +437,9 @@ async def api_queue_add(request):
     proj = explainer.create(data.get("title", ""), data.get("script") or None, None,
                             data.get("aspect") or "16:9", data.get("voice") or None,
                             float(data.get("voice_speed") or 1.0), music,
-                            data.get("style") or None, None, True)
+                            data.get("style") or None, None, True,
+                            data.get("captions") or None, data.get("transition") or None,
+                            data.get("motion") or None, bool(data.get("sfx", True)))
     job = jobqueue.add("explainer", proj["title"], {"title": proj["title"]}, via="dashboard")
     audit("queue_add", title=proj["title"], scenes=len(proj["scenes"]))
     return ok(job=job, scenes=len(proj["scenes"]), message=f"Queued '{proj['title']}' ({len(proj['scenes'])} scenes)")
@@ -457,6 +459,14 @@ async def api_queue_action(request):
         raise ValueError("action must be cancel, retry or rebuild")
     audit("queue_" + action, id=jid or job["id"])
     return ok(job=job, message=jobqueue.summary(job).split("\n")[0])
+
+
+async def style_sample(request):
+    name = request.path_params["name"]
+    p = HERE / "static" / "styles" / f"{name}.jpg"
+    if not re.fullmatch(r"[a-z0-9-]{1,30}", name) or not p.is_file():
+        return PlainTextResponse("not found", status_code=404)
+    return FileResponse(p, headers={"Cache-Control": "max-age=86400"})
 
 
 async def api_stop(request):
@@ -715,6 +725,7 @@ routes = [
     Route("/api/photos/import", api_photos_import, methods=["POST"]),
     Route("/api/photos/action", api_photos_action, methods=["POST"]),
     Route("/api/activity", api_activity),
+    Route("/styles/{name}.jpg", style_sample),
     Route("/files/{path:path}", files),
     Route("/health", lambda r: Response('{"status":"ok"}', media_type="application/json")),
 ]

@@ -611,7 +611,10 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         <div class="field"><label class="f" for="exScript">Script <span class="hint">blank line between paragraphs · a line starting with # starts a chapter · long paragraphs become ~10 s scenes</span></label>
           <textarea id="exScript" style="min-height:180px" placeholder="# Why stems matter&#10;Every song you love is built from layers…&#10;&#10;# How to practice&#10;Mute the part you play…"></textarea></div>
         <div class="row">
-          <div class="field"><label class="f" for="exStyle">Picture style <span class="hint">blank = text slides (fastest)</span></label><input type="text" id="exStyle" placeholder="clean flat illustration, soft colours, no text"></div>
+          <div class="field"><label class="f" for="exStyle">Video style <span class="hint">sets pictures, colours, captions, transitions</span></label>
+            <select id="exStyle"><option value="">Text slides (fastest)</option><option value="cinematic">Cinematic</option><option value="documentary">Documentary</option><option value="3d-cartoon">3D cartoon</option><option value="anime">Anime</option><option value="storybook">Watercolor storybook</option><option value="comic">Comic book</option><option value="clay">Claymation</option><option value="sketch">Pencil sketch</option><option value="flat">Flat illustration</option><option value="retro">Retro / VHS</option><option value="whiteboard">Minimal whiteboard</option><option value="social">Social bold</option><option value="__custom">Custom picture style…</option></select></div>
+          <div class="field" id="exStylePicWrap" hidden><label class="f">Looks like</label><img id="exStylePic" alt="" width="128" height="128" style="border-radius:8px;border:1px solid var(--line);object-fit:cover"></div>
+          <div class="field" id="exCustomWrap" hidden><label class="f" for="exCustom">Custom picture style</label><input type="text" id="exCustom" placeholder="moody oil painting, warm candlelight"></div>
           <div class="field"><label class="f" for="exVoice">Voice</label>
             <select id="exVoice"><option value="bm_george" selected>George (British, male)</option><option value="bf_emma">Emma (British, female)</option><option value="am_michael">Michael (American, male)</option><option value="af_heart">Heart (American, female)</option><option value="moss">MOSS (slower)</option></select></div>
         </div>
@@ -619,11 +622,19 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
           <div class="field"><label class="f" for="exSpeed">Voice speed <span class="hint" id="exSpeedVal">1.00×</span></label>
             <input type="range" id="exSpeed" min="0.7" max="1.6" step="0.05" value="1" aria-describedby="exSpeedVal"></div>
           <div class="field"><label class="f" for="exMusic">Music bed</label>
-            <select id="exMusic"><option value="" selected>None</option><option value="__song">Selected song (no vocals)</option></select></div>
+            <select id="exMusic"><option value="" selected>None</option><option value="__song">Selected song (no vocals)</option><option value="auto">Write music to match the style (slow)</option></select></div>
           <div class="field"><label class="f">Shape</label><div class="seg aspect" id="exAspect" data-value="16:9">
             <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
         </div>
-        <div class="actions"><button class="btn primary" id="exAdd" type="button">Add to queue</button><span class="hint">Roughly 30 s per picture plus 1 s of work per second of video.</span></div>
+        <div class="row">
+          <div class="field"><label class="f" for="exCaptions">Captions</label>
+            <select id="exCaptions"><option value="">Style default</option><option value="highlight">Word by word highlight</option><option value="pop">Big pop words</option><option value="box">Box</option><option value="subtle">Subtle</option><option value="none">None</option></select></div>
+          <div class="field"><label class="f" for="exTransition">Transitions</label>
+            <select id="exTransition"><option value="">Style default</option><option value="dip">Dip to black</option><option value="flash">Flash</option><option value="whoosh">Cut with whoosh</option><option value="cut">Hard cut</option></select></div>
+          <div class="field"><label class="f" for="exMotion">Camera</label>
+            <select id="exMotion"><option value="">Style default</option><option value="zoom">Slow zoom</option><option value="pan">Pan</option><option value="mixed">Mixed</option><option value="still">Still</option></select></div>
+        </div>
+        <div class="actions"><button class="btn primary" id="exAdd" type="button">Add to queue</button><span class="hint">Roughly 30 s per picture plus 1 s of work per second of video. Styles make a picture for every scene.</span></div>
         <h3 class="sub-h">Queue</h3>
         <div id="qList" class="jobs"></div>
         <h3 class="sub-h">Explainer projects</h3>
@@ -911,6 +922,13 @@ $$(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick 
 const segVal = sel => $(sel).dataset.value;
 $("#shSource").addEventListener("change", () => $("#shFileWrap").hidden = segVal("#shSource") !== "file");
 $("#nrMusic").onchange = e => $("#nrMusicFileWrap").hidden = e.target.value !== "__file";
+$("#exStyle").onchange = e => {
+  const v = e.target.value;
+  $("#exCustomWrap").hidden = v !== "__custom";
+  const pic = $("#exStylePic");
+  $("#exStylePicWrap").hidden = !v || v === "__custom";
+  if (v && v !== "__custom") { pic.onerror = () => $("#exStylePicWrap").hidden = true; pic.src = "/styles/" + v + ".jpg"; pic.alt = e.target.selectedOptions[0].text + " sample"; }
+};
 $("#exSpeed").oninput = e => $("#exSpeedVal").textContent = Number(e.target.value).toFixed(2) + "×";
 $("#nrSpeed").oninput = e => $("#nrSpeedVal").textContent = Number(e.target.value).toFixed(2) + "×";
 bindVal("#pfKey", "#pfKeyV", v => (v > 0 ? "+" : "") + v + " st");
@@ -1090,9 +1108,12 @@ $("#exAdd").onclick = async () => {
   if (!title || !script) return toast("Give it a title and a script.", true);
   let music = "";
   if ($("#exMusic").value === "__song") { if (!needSong()) return; music = state.song.job_id; }
+  else if ($("#exMusic").value === "auto") music = "auto";
   try {
-    const r = await api("/api/queue/add", { title, script, style: $("#exStyle").value.trim(), voice: $("#exVoice").value,
-      voice_speed: Number($("#exSpeed").value), music, aspect: segVal("#exAspect") });
+    const st = $("#exStyle").value === "__custom" ? $("#exCustom").value.trim() : $("#exStyle").value;
+    const r = await api("/api/queue/add", { title, script, style: st, voice: $("#exVoice").value,
+      voice_speed: Number($("#exSpeed").value), music, aspect: segVal("#exAspect"),
+      captions: $("#exCaptions").value, transition: $("#exTransition").value, motion: $("#exMotion").value });
     toast(r.message);
   } catch (e) { toast(e.message, true); }
   loadQueue();

@@ -323,6 +323,7 @@ def video_captions(video: str, style: str = "bottom", burn: bool = True,
 # --- long explainers and the background queue ---------------------------------
 from studio import jobqueue  # noqa: E402
 from studio.video import explainer  # noqa: E402  (registers the "explainer" job)
+from studio.video import styles as vstyles  # noqa: E402
 
 
 def _estimate(proj: dict) -> str:
@@ -339,18 +340,25 @@ def _estimate(proj: dict) -> str:
 def video_explainer(title: str, script: str | None = None, scenes: list | str | None = None,
                     aspect: str = "16:9", voice: str | None = None, voice_speed: float = 1.0,
                     music: str | None = None, style: str | None = None, seed: int | None = None,
-                    intro: bool = True) -> str:
+                    intro: bool = True, captions: str | None = None, transition: str | None = None,
+                    motion: str | None = None, sfx: bool = True) -> str:
     """Long explainer video (any length), made in the background. Returns a job id at once;
-    check it with studio_jobs. Best: pass scenes, a list of {"say": narration (about 1-3
-    sentences), "picture": image prompt (no text in it), "text": slide text if no picture,
-    "image": existing picture/clip path, "chapter": section title shown as a card and listed as
-    a YouTube chapter}. Or pass script: plain text, "# Heading" lines start chapters, split into
-    ~10 s scenes. style (e.g. "clean flat illustration, soft colours") makes a picture for every
-    scene without one; otherwise those scenes are text slides. voice: a Kokoro voice
-    (bm_george default, af_heart, am_michael, bf_emma...), "moss", or a WAV to clone.
-    voice_speed 1.0 normal. music: StemDeck song or audio file, ducked under the voice.
-    Same title again reuses every unchanged scene, so it's fast to fix and rebuild."""
-    proj = explainer.create(title, script, scenes, aspect, voice, voice_speed, music, style, seed, intro)
+    check it with studio_jobs. Best: pass scenes, a list of {"say": narration (1-3 sentences),
+    "picture": what to show (subject only; the style adds the look; no text), "chapter": section
+    title on its first scene (card + YouTube chapter), optional "text" (slide headline when no
+    picture), "image" (existing picture/clip path), "motion" (zoom-in, zoom-out, pan-left,
+    pan-right, pan-up, pan-down, still), "voice" (another voice for dialogue), "pause" (extra
+    seconds after)}. Or pass script: plain text, "# Heading" lines start chapters.
+    style: a preset (see video_styles: cinematic, documentary, 3d-cartoon, anime, storybook,
+    comic, clay, sketch, flat, retro, whiteboard, social) that sets picture look, colour grade,
+    captions, transitions and motion; or free text for a custom picture look; none = text slides.
+    captions: highlight (word by word), pop, box, subtle, none. transition: cut, dip, flash,
+    whoosh. motion: zoom, pan, mixed, still. sfx: whoosh on chapter cards.
+    voice: Kokoro (bm_george default, bf_emma, am_michael, af_heart...), "moss", or a WAV.
+    music: StemDeck song, audio file, or "auto" to write a matching instrumental (slow; needs
+    about 14 GB free). Same title again reuses every unchanged scene."""
+    proj = explainer.create(title, script, scenes, aspect, voice, voice_speed, music, style, seed, intro,
+                            captions, transition, motion, sfx)
     job = jobqueue.add("explainer", proj["title"], {"title": proj["title"]})
     return (f"Queued explainer '{proj['title']}': {_estimate(proj)}.\n{jobqueue.summary(job)}\n"
             "Check progress with studio_jobs(job_id). It appears in the dashboards when done.")
@@ -361,18 +369,28 @@ def video_explainer(title: str, script: str | None = None, scenes: list | str | 
 def video_explainer_scene(title: str, scene: int | None = None, say: str | None = None,
                           picture: str | None = None, image: str | None = None, text: str | None = None,
                           chapter: str | None = None, new_picture: bool = False, remove: bool = False,
-                          rebuild: bool = True) -> str:
+                          rebuild: bool = True, motion: str | None = None, voice: str | None = None,
+                          pause: float | None = None) -> str:
     """See or fix one scene of an explainer. Without scene: lists every scene (number, words,
     visual). With scene (1-based): change its say/picture/image/text/chapter ("" clears a
     field), new_picture=True for a different picture from the same prompt, remove=True to drop
     it. rebuild=True queues a rebuild that only remakes what changed."""
     if scene is None:
         return explainer.describe(title)
-    explainer.update_scene(title, scene, say, picture, image, text, chapter, new_picture, remove)
+    explainer.update_scene(title, scene, say, picture, image, text, chapter, new_picture, remove,
+                           motion, voice, pause)
     if not rebuild:
         return f"Scene {scene} updated (not rebuilt yet).\n" + explainer.describe(title)
     job = jobqueue.add("explainer", title, {"title": explainer._load(title)["title"]})
     return f"Scene {scene} updated; rebuilding only what changed.\n{jobqueue.summary(job)}"
+
+
+@mcp.tool()
+@guarded("video_styles")
+def video_styles() -> str:
+    """The video style presets for video_explainer(style=...), with their caption look,
+    transitions and camera motion."""
+    return vstyles.catalog()
 
 
 @mcp.tool()
