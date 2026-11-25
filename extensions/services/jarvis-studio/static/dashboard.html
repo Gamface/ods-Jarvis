@@ -593,6 +593,8 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         <div class="row">
           <div class="field" id="nrMusicFileWrap" hidden><label class="f" for="nrMusicFile">Audio file</label><input type="text" id="nrMusicFile" list="audioList" placeholder="~/Music/bed.wav"></div>
           <div class="field"><label class="f" for="nrVoice">Voice to clone (optional WAV)</label><input type="text" id="nrVoice" placeholder="default voice"></div>
+          <div class="field"><label class="f" for="nrSpeed">Voice speed <span class="hint" id="nrSpeedVal">1.00×</span></label>
+            <input type="range" id="nrSpeed" min="0.7" max="1.6" step="0.05" value="1" aria-describedby="nrSpeedVal"></div>
           <div class="field"><label class="f">Shape</label><div class="seg aspect" id="nrAspect" data-value="16:9">
             <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
         </div>
@@ -880,6 +882,7 @@ $$(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick 
 const segVal = sel => $(sel).dataset.value;
 $("#shSource").addEventListener("change", () => $("#shFileWrap").hidden = segVal("#shSource") !== "file");
 $("#nrMusic").onchange = e => $("#nrMusicFileWrap").hidden = e.target.value !== "__file";
+$("#nrSpeed").oninput = e => $("#nrSpeedVal").textContent = Number(e.target.value).toFixed(2) + "×";
 bindVal("#pfKey", "#pfKeyV", v => (v > 0 ? "+" : "") + v + " st");
 
 /* run workflows */
@@ -964,7 +967,7 @@ const BUILDERS = {
     if (!title || !script) { toast("Give the video a title and a script.", true); return; }
     const m = $("#nrMusic").value; let music = "";
     if (m === "__song") { if (!needSong()) return; music = state.song.job_id; } else if (m === "__file") music = $("#nrMusicFile").value.trim();
-    return { title, script, images: $("#nrImages").value.trim(), voice: $("#nrVoice").value.trim(), music, aspect: segVal("#nrAspect") };
+    return { title, script, images: $("#nrImages").value.trim(), voice: $("#nrVoice").value.trim(), music, aspect: segVal("#nrAspect"), voice_speed: Number($("#nrSpeed").value) };
   },
   v_captions() {
     const f = $("#caFile").value.trim(); if (!f) { toast("Enter a video file.", true); return; }

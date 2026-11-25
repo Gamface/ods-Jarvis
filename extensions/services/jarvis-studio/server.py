@@ -302,11 +302,13 @@ def video_shorts(source: str, platforms: list[str] | None = None, seconds: float
 @guarded("video_narrated")
 def video_narrated(script: str, title: str, images: str | None = None,
                    voice_wav: str | None = None, music: str | None = None,
-                   aspect: str = "16:9") -> str:
+                   aspect: str = "16:9", voice_speed: float = 1.0) -> str:
     """Narrated video: script text (blank line between paragraphs) or a .txt path is read by
     MOSS-TTS; one slide per paragraph from your photos/clips folder (or generated text
-    slides); captions; optional music bed (StemDeck song or audio file), ducked under the voice."""
-    return vwf.narrated(script, title, images, voice_wav, music, aspect)
+    slides); captions; optional music bed (StemDeck song or audio file), ducked under the voice.
+    images: a folder, or exact files comma-separated in slide order. voice_speed: 1.0 normal,
+    1.15 to 1.3 for a punchy ad, 0.85 calmer (0.5 to 2.0, pitch unchanged)."""
+    return vwf.narrated(script, title, images, voice_wav, music, aspect, voice_speed=voice_speed)
 
 
 @mcp.tool()

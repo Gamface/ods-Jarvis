@@ -498,6 +498,8 @@ def shorts(source: str, platforms: list[str] | None = None, length: float = 30,
 def _paragraphs(script: str) -> list[str]:
     is_file = "\n" not in script and len(script) < 255 and Path(script).expanduser().is_file()
     text = Path(script).expanduser().read_text() if is_file else script
+    if "\n" not in text and "\\n" in text:  # model sent escaped newlines ("\\n\\n") as text
+        text = text.replace("\\r", "").replace("\\n", "\n")
     paras = [" ".join(x.split()) for x in text.split("\n\n") if x.strip()]
     if len(paras) == 1:  # one block: split every ~2 sentences
         import re
@@ -507,14 +509,18 @@ def _paragraphs(script: str) -> list[str]:
 
 
 def narrated(script: str, title: str, images=None, voice: str | None = None, music: str | None = None,
-             aspect: str = "16:9", music_gain: float = 0.35) -> str:
+             aspect: str = "16:9", music_gain: float = 0.35, voice_speed: float = 1.0) -> str:
     """Script (text or .txt path) -> a voice-over video. One slide per paragraph: your photos
     (Ken Burns) or generated text slides. music: StemDeck song (instrumental used), an audio
-    file, or none. Whisper captions are burned in and saved as .srt."""
+    file, or none. voice_speed: 1.0 normal, 1.2 faster, 0.85 slower (pitch stays the same).
+    Captions come from the script and are burned in and saved as .srt."""
     from ..workflows import speak
     paras = _paragraphs(script)
     if not paras:
         raise ValueError("The script is empty")
+    voice_speed = float(voice_speed or 1.0)
+    if not 0.5 <= voice_speed <= 2.0:
+        raise ValueError("voice_speed must be between 0.5 and 2.0")
     w, h = size_of(aspect)
     d = vout("narrated", title)
     pics = media_in(images) if images else []
@@ -523,7 +529,13 @@ def narrated(script: str, title: str, images=None, voice: str | None = None, mus
     gap, intro = 0.45, 3.0
     voice_parts, lens = [], []
     for i, para in enumerate(paras):
-        wav = speak(para, d / f"voice-{i:02d}.wav", voice)
+        raw = speak(para, d / f"voice-{i:02d}.raw.wav", voice)
+        # Same format as the silence clips (48 kHz mono): the concat step needs every part to
+        # match, or stereo clips get read as mono and play at half speed.
+        wav = d / f"voice-{i:02d}.wav"
+        speed = [] if abs(voice_speed - 1.0) < 1e-3 else ["-af", f"atempo={voice_speed:.3f}"]
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(raw), *speed, "-ar", "48000", "-ac", "1",
+             "-c:a", "pcm_s16le", str(wav)])
         voice_parts.append(wav)
         lens.append(probe(wav)["duration"])
     # narration track: intro silence, then each paragraph followed by a short gap

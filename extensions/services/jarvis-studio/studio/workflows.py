@@ -8,6 +8,7 @@
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -141,6 +142,27 @@ def speak(text: str, dest: Path, voice: str | None = None) -> Path:
     return dest
 
 
+SONG_MIN_FREE_GB = float(os.environ.get("JARVIS_SONG_MIN_FREE_GB", "14"))
+
+
+def _free_gb() -> float:
+    """RAM the system can hand out now (MemAvailable plus free swap), in GB."""
+    info = {}
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        k, v = line.split(":", 1)
+        info[k] = int(v.split()[0])
+    return (info.get("MemAvailable", 0) + info.get("SwapFree", 0)) / 1048576
+
+
+def _check_memory_for_song() -> None:
+    """ACE-Step needs about 13 GB on this CPU; refuse early instead of being killed halfway."""
+    free = _free_gb()
+    if free < SONG_MIN_FREE_GB:
+        raise MemoryError(f"not enough free memory to write a song: {free:.1f} GB free, "
+                          f"about {SONG_MIN_FREE_GB:.0f} GB needed. Close some apps or "
+                          "containers and try again.")
+
+
 def generate_music(caption: str, out: Path, duration: float = 30, lyrics: str | None = None,
                    task: str = "text2music", src_audio: Path | None = None,
                    strength: float = 0.5, bpm: int | None = None, key: str | None = None,
@@ -152,6 +174,7 @@ def generate_music(caption: str, out: Path, duration: float = 30, lyrics: str | 
             "time_signature": time_signature, "language": language, "seed": seed}
     from .images import heavy_job  # one heavy AI job at a time (songs and images)
     with heavy_job("song"):
+        _check_memory_for_song()
         proc = audio.run([_venv_python(ACESTEP_DIR), str(SCRIPTS_DIR / "acestep_generate.py"),
                           json.dumps(args)], timeout=7200)
     for line in proc.stdout.splitlines():

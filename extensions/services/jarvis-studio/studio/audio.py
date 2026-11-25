@@ -12,6 +12,9 @@ PID_FILE = STATE_DIR / "player.pid"
 
 def run(cmd: list[str], timeout: int = 900) -> subprocess.CompletedProcess:
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if proc.returncode == -9:
+        raise MemoryError("the job ran out of memory and was stopped by the system. "
+                          "Close some apps (browser tabs, unused containers) and try again.")
     if proc.returncode != 0:
         raise RuntimeError(f"{cmd[0]} failed: {proc.stderr[-800:]}")
     return proc

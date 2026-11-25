@@ -10,6 +10,8 @@ WorkingDirectory=@HERE@
 ExecStart=%h/ods/data/jarvis-studio/venv/bin/python server.py
 Restart=on-failure
 RestartSec=10
+# A song or video job that runs out of memory is killed on its own; keep the server up
+OOMPolicy=continue
 
 [Install]
 WantedBy=default.target

@@ -171,7 +171,8 @@ WORKFLOWS = {
         None, a.get("caption") or "auto", a.get("song") or None, a.get("title") or None)),
     "v_narrated": ("Narrated video", lambda a: vwf.narrated(
         a["script"], a["title"], a.get("images") or None, a.get("voice") or None,
-        a.get("music") or None, a.get("aspect") or "16:9")),
+        a.get("music") or None, a.get("aspect") or "16:9",
+        voice_speed=float(a.get("voice_speed") or 1.0))),
     "v_captions": ("Captions", lambda a: vwf.captions(
         a["video"], a.get("style") or "bottom", bool(a.get("burn", True)), a.get("language") or None)),
 }
