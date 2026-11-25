@@ -112,6 +112,21 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .pres .n { font-size: 11px; color: var(--ink-2); display: flex; justify-content: space-between; }
 @media (max-width: 520px) { .presence { grid-template-columns: repeat(3, 1fr); } }
 
+
+/* book studio */
+.bk-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.bk-bar select { flex: 1 1 220px; max-width: 420px; }
+.bk-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 16px; background: var(--panel-2); }
+.bk-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.bk-head h2 { margin: 0; font-size: 1.15rem; }
+.bk-ch { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; background: var(--panel); }
+.bk-ch .t { display: flex; gap: 10px; align-items: center; }
+.bk-ch .t b { flex: 1; min-width: 0; }
+.bk-ch img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.bk-ch textarea { min-height: 220px; }
+.bk-list { display: grid; gap: 6px; }
+.bk-files a { display: block; padding: 3px 0; overflow-wrap: anywhere; }
+.bk-gate { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 10px 0; background: var(--panel); border-radius: 0 8px 8px 0; }
 /* tabs */
 .tabs { display: flex; flex-wrap: wrap; gap: 0; padding: 0 6px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .tab { border: 0; background: none; padding: 7px 7px; cursor: pointer; color: var(--ink-2); font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
@@ -321,6 +336,7 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         <button class="on" data-mode="music" role="tab">♪ Music studio</button>
         <button data-mode="video" role="tab">▶ Video studio</button>
         <button data-mode="photo" role="tab">▣ Photo studio</button>
+        <button data-mode="book" role="tab">❏ Book studio</button>
       </div>
       <span class="hint" id="modeHint">Songs from the library feed both studios.</span>
     </div>
@@ -701,6 +717,36 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
           <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="phImport" placeholder="~/Pictures/gig-2026"><button class="btn" id="phImportBtn">Copy in</button></div></div>
       </div>
     </section>
+
+    <section class="panel" id="bookPanel" hidden>
+      <div class="panel-b">
+        <div class="bk-bar">
+          <select id="bkSelect" aria-label="Book"><option value="">— pick a book —</option></select>
+          <button class="btn sm" id="bkNewBtn" type="button">+ New book</button>
+          <button class="btn sm ghost" id="bkFolderBtn" type="button">Open folder</button>
+          <span class="hint" id="bkCount"></span>
+        </div>
+        <div id="bkNew" class="bk-card" hidden>
+          <p class="pane-intro">Novels, nonfiction ebooks, children's picture books and puzzle books. Jarvis writes the words (ask him in chat); this page lets you approve the outline, read and fix chapters, add puzzles and build EPUB, a print PDF and Amazon KDP paperback files.</p>
+          <div class="row">
+            <div class="field" style="flex:2 1 240px"><label class="f" for="bkTitle">Title</label><input type="text" id="bkTitle" placeholder="The Lighthouse Keeper's Daughter"></div>
+            <div class="field"><label class="f" for="bkKind">Kind</label>
+              <select id="bkKind"><option value="novel">Novel</option><option value="ebook">Nonfiction ebook</option><option value="picture">Children's picture book</option><option value="puzzle">Puzzle book</option></select></div>
+            <div class="field"><label class="f" for="bkTrim">Trim size</label>
+              <select id="bkTrim"><option value="">Usual for the kind</option><option>5x8</option><option>5.5x8.5</option><option>6x9</option><option>7x10</option><option>8x10</option><option>8x8</option><option>8.5x8.5</option><option>8.5x11</option></select></div>
+          </div>
+          <div class="row">
+            <div class="field"><label class="f" for="bkAuthor">Author / pen name</label><input type="text" id="bkAuthor"></div>
+            <div class="field"><label class="f" for="bkAudience">Reader</label><input type="text" id="bkAudience" placeholder="adults who love cosy mysteries · ages 3-6"></div>
+          </div>
+          <div class="field"><label class="f" for="bkBrief">What it's about</label><textarea id="bkBrief" style="min-height:80px" placeholder="A girl finds her mother's letters hidden in a lighthouse during a storm…"></textarea></div>
+          <div class="actions"><button class="btn primary" id="bkCreate" type="button">Start the book</button><span class="hint">Then ask Jarvis to plan and outline it. Puzzle books you can make right here.</span></div>
+        </div>
+        <div id="bkDetail"><div class="empty">Pick a book, or start a new one.</div></div>
+        <h3 class="sub-h">Book builds</h3>
+        <div id="bkJobs" class="jobs"></div>
+      </div>
+    </section>
     <datalist id="videoList"></datalist>
     <datalist id="audioList"></datalist>
   </div>
@@ -908,8 +954,11 @@ for (const id of ["musicPanel", "videoPanel", "photoPanel"]) {
 function setMode(m) {
   $$(".mode button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
   $("#musicPanel").hidden = m !== "music"; $("#videoPanel").hidden = m !== "video"; $("#photoPanel").hidden = m !== "photo";
-  $("#modeHint").textContent = m === "photo" ? "Pictures you make or add here become covers, backgrounds and slides." : "Songs from the library feed both studios.";
+  $("#bookPanel").hidden = m !== "book";
+  $("#modeHint").textContent = m === "photo" ? "Pictures you make or add here become covers, backgrounds and slides."
+    : m === "book" ? "Jarvis writes; you approve the outline here, then build EPUB, print PDF and KDP files." : "Songs from the library feed both studios.";
   if (m === "photo") loadPhotos();
+  if (m === "book") setTimeout(loadBooks);
   try { localStorage.setItem("jarvis-mode", m); } catch {}
 }
 $$(".mode button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
@@ -1118,6 +1167,118 @@ $("#exAdd").onclick = async () => {
   } catch (e) { toast(e.message, true); }
   loadQueue();
 };
+
+
+/* book studio */
+const bk = { title: null, open: new Set() };
+async function loadBooks() {
+  let r; try { r = await api("/api/books"); } catch { return; }
+  const sel = $("#bkSelect"), cur = bk.title || (() => { try { return localStorage.getItem("jarvis-book"); } catch { return null; } })();
+  sel.replaceChildren(el("option", { value: "", text: "— pick a book —" }),
+    ...r.books.map(b => el("option", { value: b.title, text: `${b.title} · ${b.label} · ${b.status_text.split(":")[0]}` })));
+  $("#bkCount").textContent = r.books.length ? `${r.books.length} book${r.books.length > 1 ? "s" : ""}` : "";
+  if (cur && r.books.some(b => b.title === cur)) { sel.value = cur; if (bk.title !== cur) { bk.title = cur; loadBook(); } }
+  else if (!r.books.length) $("#bkNew").hidden = false;
+  const prev = bk.jobStatus || {};
+  bk.jobStatus = Object.fromEntries(r.jobs.map(j => [j.id, j.status]));
+  for (const j of r.jobs) if (prev[j.id] && prev[j.id] !== j.status && j.status === "done") { toast(`Book built: ${j.title}`); if (j.title === bk.title) loadBook(); }
+  $("#bkJobs").replaceChildren(...(r.jobs.length ? r.jobs.map(renderQueueJob) : [el("div", { class: "empty", text: "No builds yet." })]));
+}
+async function bookAction(data, reload = true) {
+  try { const r = await api("/api/book/action", { title: bk.title, ...data }); toast(r.message); if (reload) { await loadBook(); loadBooks(); } return r; }
+  catch (e) { toast(e.message, true); }
+}
+function fileLink(f) { return el("a", { href: "/files/" + encodeURI(f.path), target: "_blank", rel: "noopener", text: `${f.name} · ${fmtSize(f.size)}` }); }
+async function loadBook() {
+  if (!bk.title) { $("#bkDetail").replaceChildren(el("div", { class: "empty", text: "Pick a book, or start a new one." })); return; }
+  let r; try { r = await api("/api/book?title=" + encodeURIComponent(bk.title)); } catch (e) { toast(e.message, true); return; }
+  bk.folder = r.folder;
+  const b = r.book, isPz = b.kind === "puzzle", isPic = b.kind === "picture", unit = isPic ? "Page" : "Chapter";
+  const kids = [el("div", { class: "bk-head" }, el("h2", { text: b.title }),
+    el("span", { class: "hint", text: `${b.label} · ${b.trim} in · ${b.paper} paper · ${b.status_text}` }))];
+  if (!isPz) {
+    const words = r.rows.reduce((a, x) => a + x.words, 0);
+    if (!r.rows.length) kids.push(el("div", { class: "bk-gate", text: `No outline yet. Ask Jarvis in chat: "Plan and outline the book '${b.title}'". He'll save a plan and an outline for you to approve here.` }));
+    else if (!b.approved) kids.push(el("div", { class: "bk-gate" }, el("b", { text: "The outline is waiting for you. " }),
+      "Read it below, change anything, then approve it. Nothing is written until you do. ",
+      el("button", { class: "btn sm primary", type: "button", text: "Approve outline", onclick: () => bookAction({ action: "approve" }) })));
+    else kids.push(el("div", { class: "hint", text: `Approved. ${words} words written. Ask Jarvis: "write the next chapter of '${b.title}'" (or "keep writing until it's done").` }));
+    const plan = el("textarea", { style: "min-height:120px", placeholder: "Story bible / ebook plan (Jarvis writes this)" }); plan.value = b.plan || "";
+    const outline = el("textarea", { style: "min-height:140px", placeholder: "1. Title — what happens" });
+    outline.value = r.rows.map(x => `${x.n}. ${x.title}${x.summary ? " — " + x.summary : ""}`).join("\n");
+    kids.push(el("details", { class: "bk-card", open: !b.approved && r.rows.length ? true : false },
+      el("summary", { text: "Plan and outline" }),
+      el("div", { class: "field" }, el("label", { class: "f", text: "Plan" }), plan),
+      el("div", { class: "actions" }, el("button", { class: "btn sm", type: "button", text: "Save plan", onclick: () => bookAction({ action: "plan", plan: plan.value }) })),
+      el("div", { class: "field" }, el("label", { class: "f", text: `Outline (one ${unit.toLowerCase()} per line: title — summary)` }), outline),
+      el("div", { class: "actions" }, el("button", { class: "btn sm", type: "button", text: "Save outline", onclick: () => bookAction({ action: "outline", outline: outline.value }) }),
+        b.approved ? el("button", { class: "btn sm ghost", type: "button", text: "Take back approval", onclick: () => bookAction({ action: "unapprove" }) }) : null)));
+    const list = r.rows.map(x => {
+      const row = el("div", { class: "bk-ch" });
+      const head = el("div", { class: "t" }, x.pic ? el("img", { src: "/files/" + encodeURI(x.pic), alt: "" }) : null,
+        el("b", { text: `${x.n}. ${x.title}` }), el("span", { class: "hint", text: x.words ? `${x.words} words` : "not written" }),
+        el("button", { class: "btn sm ghost", type: "button", text: bk.open.has(x.n) ? "Close" : (x.words ? "Read / edit" : "Write"), onclick: () => { bk.open.has(x.n) ? bk.open.delete(x.n) : bk.open.add(x.n); loadBook(); } }));
+      row.append(head);
+      if (bk.open.has(x.n)) {
+        const ta = el("textarea", { "aria-label": `${unit} ${x.n} text` }); ta.value = x.text;
+        const pic = isPic ? el("input", { type: "text", value: x.picture || "", placeholder: "What the picture shows (use the characters' names)" }) : null;
+        row.append(ta);
+        if (pic) row.append(el("div", { class: "field" }, el("label", { class: "f", text: "Picture" }), pic));
+        if (x.notes) row.append(el("div", { class: "hint", text: "Continuity notes: " + x.notes }));
+        row.append(el("div", { class: "actions" },
+          el("button", { class: "btn sm primary", type: "button", text: "Save", disabled: !b.approved, title: b.approved ? "" : "Approve the outline first",
+            onclick: () => bookAction({ action: "chapter", n: x.n, text: ta.value, picture: pic ? pic.value : undefined }) }),
+          isPic && x.pic ? el("button", { class: "btn sm", type: "button", text: "Draw a new picture", onclick: () => bookAction({ action: "new_picture", n: x.n }) }) : null,
+          el("span", { class: "hint", text: "To rewrite with a note, ask Jarvis: \"rewrite " + unit.toLowerCase() + " " + x.n + " of '" + b.title + "' so that…\"" })));
+      }
+      return row;
+    });
+    if (list.length) kids.push(el("h3", { class: "sub-h", text: isPic ? "Pages" : "Chapters" }), el("div", { class: "bk-list" }, ...list));
+  } else {
+    const type = el("select", {}, ...["wordsearch:Word search", "sudoku:Sudoku", "logic:Logic grid", "whodunit:Whodunit case"].map(o => el("option", { value: o.split(":")[0], text: o.split(":")[1] })));
+    const count = el("input", { type: "number", min: "1", max: "100", value: "10", style: "width:80px" });
+    const diff = el("select", {}, ...["easy", "medium", "hard"].map(o => el("option", { value: o, text: o, selected: o === "medium" })));
+    const words = el("textarea", { style: "min-height:70px", placeholder: "Word search words, comma separated (12-18 are picked for each puzzle). Ask Jarvis for themed lists." });
+    const wf = el("div", { class: "field" }, words);
+    type.onchange = () => wf.hidden = type.value !== "wordsearch";
+    kids.push(el("div", { class: "bk-card" }, el("b", { text: "Add puzzles" }), el("div", { class: "hint", text: "Made in code: every puzzle has exactly one answer, with an answer key at the back." }),
+      el("div", { class: "row" }, el("div", { class: "field" }, el("label", { class: "f", text: "Type" }), type),
+        el("div", { class: "field" }, el("label", { class: "f", text: "How many" }), count),
+        el("div", { class: "field" }, el("label", { class: "f", text: "Difficulty" }), diff)), wf,
+      el("div", { class: "actions" }, el("button", { class: "btn sm primary", type: "button", text: "Add", onclick: () => bookAction({ action: "puzzles", type: type.value, count: Number(count.value), difficulty: diff.value, words: words.value }) }),
+        el("span", { class: "hint", text: "Jarvis can write a short story or case file for any logic puzzle or mystery." }))));
+    if (r.puzzles.length) kids.push(el("h3", { class: "sub-h", text: `Puzzles (${r.puzzles.length})` }),
+      el("div", { class: "bk-list" }, ...r.puzzles.map(p => el("div", { class: "bk-ch" }, el("div", { class: "t" },
+        el("b", { text: `${p.n}. ${p.title}` }), el("span", { class: "hint", text: `${p.type} · ${p.difficulty}${p.story ? " · story" : ""}` }),
+        el("button", { class: "btn sm ghost", type: "button", text: "Remove", onclick: () => { if (confirm(`Remove puzzle ${p.n}?`)) bookAction({ action: "remove_puzzle", n: p.n }); } }))))));
+  }
+  const fmts = isPz ? ["pdf", "kdp"] : ["epub", "pdf", "kdp"];
+  const boxes = fmts.map(f => el("label", { class: "check" }, el("input", { type: "checkbox", value: f, checked: true }),
+    { epub: " EPUB (Kindle, Apple Books)", pdf: " Print PDF", kdp: " KDP cover + listing kit" }[f]));
+  kids.push(el("div", { class: "bk-card" }, el("b", { text: "Build the files" }),
+    el("div", { class: "row" }, ...boxes),
+    el("div", { class: "actions" }, el("button", { class: "btn primary", type: "button", text: "Build", onclick: () => {
+      const f = boxes.map(l => l.querySelector("input")).filter(i => i.checked).map(i => i.value);
+      if (!f.length) return toast("Pick at least one format.", true);
+      bookAction({ action: "build", formats: f.join(",") }).then(() => loadBooks()); } }),
+      el("span", { class: "hint", text: isPic ? "Draws each page's picture first (about 30 s each)." : "Runs in the background; a minute or two." })),
+    b.listing?.description ? null : el("div", { class: "hint", text: `No KDP listing yet. Ask Jarvis: "write the KDP listing for '${b.title}'".` })));
+  if (r.files.length) kids.push(el("h3", { class: "sub-h", text: "Files" }), el("div", { class: "bk-files" }, ...r.files.map(fileLink)));
+  $("#bkDetail").replaceChildren(...kids);
+}
+$("#bkSelect").onchange = () => { bk.title = $("#bkSelect").value || null; bk.open.clear(); try { localStorage.setItem("jarvis-book", bk.title || ""); } catch {} loadBook(); };
+$("#bkNewBtn").onclick = () => { $("#bkNew").hidden = !$("#bkNew").hidden; };
+$("#bkFolderBtn").onclick = () => api("/api/open", { path: (bk.title && bk.folder) || "books/" }).then(r => toast(r.message)).catch(e => toast(e.message, true));
+$("#bkCreate").onclick = async () => {
+  const title = $("#bkTitle").value.trim();
+  if (!title) return toast("Give the book a title.", true);
+  try {
+    const r = await api("/api/book/new", { title, kind: $("#bkKind").value, trim: $("#bkTrim").value, author: $("#bkAuthor").value, audience: $("#bkAudience").value, brief: $("#bkBrief").value });
+    toast(r.message); bk.title = r.title; try { localStorage.setItem("jarvis-book", r.title); } catch {}
+    $("#bkNew").hidden = true; $("#bkTitle").value = $("#bkBrief").value = ""; await loadBooks(); loadBook();
+  } catch (e) { toast(e.message, true); }
+};
+setInterval(() => { if (!$("#bookPanel").hidden) loadBooks(); }, 5000);
 
 /* outputs */
 const IMG_PRESETS = ["album cover, ", "gig poster, ", "video thumbnail, ", "stage backdrop, ", "concept art, "];

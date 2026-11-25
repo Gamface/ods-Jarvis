@@ -36,6 +36,8 @@ from studio import workflows as wf
 from studio.video import workflows as vwf
 from studio import jobqueue
 from studio.video import explainer
+from studio.books import build as book_build
+from studio.books import project as books
 from studio.video.common import VIDEO_OUT, vaapi_ok
 from studio.config import (safe_name, ACESTEP_DIR, BASIC_PITCH, MOSS_DIR, OUT_ROOT, STEMDECK_URL,
                            out_dir)
@@ -179,7 +181,7 @@ WORKFLOWS = {
         a["video"], a.get("style") or "bottom", bool(a.get("burn", True)), a.get("language") or None)),
 }
 
-ROOTS = {"music": OUT_ROOT, "video": VIDEO_OUT}
+ROOTS = {"music": OUT_ROOT, "video": VIDEO_OUT, "books": books.BOOKS_OUT}
 # Paths may contain spaces (song titles); they end at a newline or a " (" note.
 PATH_RE = re.compile("(?:" + "|".join(re.escape(str(r)) for r in ROOTS.values()) +
                      r")/[^\n]+?\.(?:mp4|wav|mp3|png|jpg|pdf|mid|lrc|txt|aup3|ardour|otio|srt)\b")
@@ -461,6 +463,87 @@ async def api_queue_action(request):
     return ok(job=job, message=jobqueue.summary(job).split("\n")[0])
 
 
+# --- books ---------------------------------------------------------------------
+def _rel(p: Path) -> str | None:
+    try:
+        return "books/" + str(p.resolve().relative_to(books.BOOKS_OUT.resolve()))
+    except ValueError:
+        return None
+
+
+async def api_books(request):
+    books.BOOKS_OUT.mkdir(parents=True, exist_ok=True)
+    jobs = [j for j in jobqueue.list_jobs(40) if j["kind"] == "book"]
+    return ok(books=books.list_books(), jobs=jobs[:10], folder=str(books.BOOKS_OUT))
+
+
+async def api_book(request):
+    b = books.load(request.query_params.get("title", ""))
+    pics = {n: _rel(p) for n, p in book_build.existing_pictures(b).items()}
+    files = [{"path": _rel(p), "name": str(p.relative_to(books.book_dir(b["title"]))), "size": p.stat().st_size,
+              "mtime": p.stat().st_mtime} for p in books.outputs(b)]
+    rows = books.chapter_rows(b)
+    for r in rows:
+        r["pic"] = pics.get(r["n"])
+    from studio.books.puzzles import public_view
+    puzzles = [{"n": i, "type": p["type"], "difficulty": p["difficulty"], "title": p["title"],
+                "view": public_view(p), "story": p.get("story", "")} for i, p in enumerate(b.get("puzzles", []), 1)]
+    keep = {k: b.get(k) for k in ("title", "kind", "brief", "audience", "author", "trim", "paper", "style", "plan",
+                                   "characters", "approved", "approved_at", "status", "target_words", "listing",
+                                   "dedication", "built")}
+    keep["status_text"] = books.STATUS_TEXT.get(b.get("status"), "")
+    keep["label"] = books.KINDS[b["kind"]]["label"]
+    return ok(book=keep, rows=rows, puzzles=puzzles, files=files, folder=_rel(books.book_dir(b["title"])))
+
+
+async def api_book_new(request):
+    d = await body(request)
+    b = books.create(d.get("title", ""), d.get("kind") or "novel", d.get("brief", ""), d.get("audience", ""),
+                     d.get("author", ""), d.get("trim") or None)
+    audit("book_new", title=b["title"], kind=b["kind"])
+    tip = ("Add puzzles below." if b["kind"] == "puzzle" else
+           f"Now ask Jarvis: \"plan and outline the book '{b['title']}'\".")
+    return ok(title=b["title"], message=f"Started '{b['title']}'. {tip}")
+
+
+async def api_book_action(request):
+    d = await body(request)
+    title, action = d.get("title", ""), d.get("action")
+    msg = "Saved."
+    if action in ("approve", "unapprove"):
+        books.approve(title, action == "approve")
+        msg = "Outline approved: Jarvis can write it now." if action == "approve" else "Approval taken back."
+    elif action == "outline":
+        books.set_plan(title, outline=d.get("outline", ""))
+        msg = "Outline saved (it needs approving again)."
+    elif action == "plan":
+        books.set_plan(title, plan=d.get("plan"), author=d.get("author"), dedication=d.get("dedication"))
+    elif action == "chapter":
+        n = int(d.get("n", 0))
+        books.write(title, n, d.get("text", ""), picture=d.get("picture"))
+        msg = f"Saved part {n}."
+    elif action == "new_picture":
+        b = books.load(title)
+        books.write(title, int(d.get("n", 0)), b["chapters"][int(d["n"]) - 1].get("text", ""), new_picture=True)
+        msg = "A new picture will be drawn at the next build."
+    elif action == "puzzles":
+        _, made = books.add_puzzles(title, d.get("type"), int(d.get("count") or 1), d.get("difficulty") or "medium",
+                                    d.get("words") or None)
+        msg = f"Added {len(made)} puzzles."
+    elif action == "remove_puzzle":
+        books.add_puzzles(title, None, remove=int(d.get("n", 0)))
+        msg = "Puzzle removed."
+    elif action == "build":
+        b = books.load(title)
+        fm = book_build.formats_for(b, d.get("formats") or None)
+        job = jobqueue.add("book", b["title"], {"title": b["title"], "formats": fm}, via="dashboard")
+        msg = f"Building '{b['title']}' ({', '.join(fm)}). " + jobqueue.summary(job).split("\n")[0]
+    else:
+        raise ValueError("unknown action")
+    audit("book_" + str(action), title=title)
+    return ok(message=msg)
+
+
 async def style_sample(request):
     name = request.path_params["name"]
     p = HERE / "static" / "styles" / f"{name}.jpg"
@@ -720,6 +803,10 @@ routes = [
     Route("/api/queue", api_queue),
     Route("/api/queue/add", api_queue_add, methods=["POST"]),
     Route("/api/queue/action", api_queue_action, methods=["POST"]),
+    Route("/api/books", api_books),
+    Route("/api/book", api_book),
+    Route("/api/book/new", api_book_new, methods=["POST"]),
+    Route("/api/book/action", api_book_action, methods=["POST"]),
     Route("/api/photos", api_photos),
     Route("/api/photos/upload", api_photos_upload, methods=["POST"]),
     Route("/api/photos/import", api_photos_import, methods=["POST"]),

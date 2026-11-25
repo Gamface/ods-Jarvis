@@ -415,6 +415,160 @@ def studio_job_cancel(job_id: str, run_again: bool = False) -> str:
     return jobqueue.summary(job)
 
 
+# --- books ----------------------------------------------------------------------
+from studio.books import build as book_build_mod  # noqa: E402  (registers the "book" job)
+from studio.books import project as books  # noqa: E402
+from studio.books import puzzles as book_puzzles_mod  # noqa: E402
+
+
+@mcp.tool()
+@guarded("book_new")
+def book_new(title: str, kind: str = "novel", brief: str = "", audience: str = "", author: str = "",
+             trim: str | None = None, paper: str | None = None, style: str | None = None,
+             target_words: int | None = None, replace: bool = False) -> str:
+    """Start a book project. kind: novel, ebook (nonfiction), picture (children's picture book) or
+    puzzle (puzzle book). brief: what it's about, in the user's words. trim: 5x8, 5.5x8.5, 6x9
+    (novel/ebook default), 7x10, 8x10, 8x8, 8.5x8.5 (picture default), 8.5x11 (puzzle default).
+    paper: white, cream (novels), color (picture books). style: picture look for picture books.
+    target_words: words per chapter (novel 2500, ebook 1500) or per page (picture 40).
+    Next: book_plan (plan + outline), then the user approves the outline."""
+    b = books.create(title, kind, brief, audience, author, trim, paper, style, target_words, replace)
+    nxt = ("Next: add puzzles with book_puzzles." if b["kind"] == "puzzle" else
+           "Next: write the plan (story bible / ebook plan / character sheet) and the outline with book_plan, "
+           "then show the outline to the user for approval.")
+    return f"Started '{b['title']}' ({books.KINDS[b['kind']]['label']}, {b['trim']} in). {nxt}"
+
+
+@mcp.tool()
+@guarded("book_plan")
+def book_plan(title: str, plan: str | None = None, outline: list | str | None = None,
+              characters: dict | str | None = None, style: str | None = None, cover: str | None = None,
+              dedication: str | None = None, author: str | None = None, subtitle: str | None = None,
+              target_words: int | None = None, approve: bool = False) -> str:
+    """Save the book's plan and outline. plan: the story bible (novel: premise, characters, setting,
+    tone, ending), ebook plan (reader, promise, key ideas) or theme sheet. outline: a list of
+    {"title", "summary"} per chapter (picture books: one per page, with "picture"). characters:
+    {"Name": "one exact sentence of how they look"} (used in every picture). cover: what the front
+    cover picture shows. A changed outline needs approval again. approve=True ONLY when the user
+    has said the outline is OK (they can also approve on the dashboard's Books tab)."""
+    b = books.set_plan(title, plan, outline, characters, style, cover, dedication, author, subtitle,
+                       target_words, approve)
+    rows = books.chapter_rows(b)
+    head = (f"Saved. Outline ({len(rows)}):\n" + "\n".join(f"{r['n']}. {r['title']} — {r['summary']}" for r in rows)
+            if rows else "Saved the plan. Add the outline next.")
+    tail = ("\nApproved: write chapter 1 (book_context, then book_write)." if b["approved"] else
+            "\nShow this outline to the user and ask them to approve it or ask for changes. Nothing is written "
+            "until it's approved." if rows else "")
+    return head + tail
+
+
+@mcp.tool()
+@guarded("book_context")
+def book_context(title: str, chapter: int | None = None) -> str:
+    """Everything needed to write the next chapter or page, trimmed to fit: plan, characters,
+    outline, continuity notes, the end of the previous chapter and the task. Without chapter it
+    picks the first one that isn't finished. Call it before each book_write."""
+    return books.context(title, chapter)
+
+
+@mcp.tool()
+@guarded("book_write")
+def book_write(title: str, chapter: int | None = None, text: str = "", notes: str | None = None,
+               append: bool = False, chapter_title: str | None = None, picture: str | None = None,
+               image: str | None = None, new_picture: bool = False, pages: list | None = None) -> str:
+    """Save a chapter (or picture-book page) after the outline is approved. text: plain text,
+    blank line between paragraphs, no chapter heading (## for sub-headings in ebooks). notes:
+    one or two lines of continuity facts for later chapters. append=True adds to what's there
+    (for long chapters written in parts); without it the text replaces the chapter. Picture
+    books: picture = one sentence of what the page shows, using the characters' names (no words
+    in pictures); image = an existing picture file instead; new_picture=True draws it again; or
+    pages = [{"text", "picture"}, ...] for every page at once."""
+    if pages:
+        b = books.write_pages(title, pages)
+        return f"Saved {len(pages)} pages.\n" + books.describe(title)
+    if chapter is None:
+        raise ValueError("Say which chapter (1-based).")
+    b = books.write(title, chapter, text, notes, append, chapter_title, picture, image, new_picture)
+    c = b["chapters"][chapter - 1]
+    target = b["target_words"]
+    left = [r["n"] for r in books.chapter_rows(b) if r["words"] < max(10, target * 0.7)]
+    msg = f"Saved {'page' if b['kind'] == 'picture' else 'chapter'} {chapter}: {c['words']} words"
+    if b["kind"] != "picture":
+        msg += f" (target {target})"
+        if c["words"] < target * 0.7:
+            msg += ". It's short: call book_context and keep going with append=True"
+    msg += "." + (f" Still to write: {', '.join(map(str, left[:15]))}." if left else
+                  " Everything is written: book_listing for the KDP listing, then book_build.")
+    return msg
+
+
+@mcp.tool()
+@guarded("book_puzzles")
+def book_puzzles(title: str, type: str | None = None, count: int = 1, difficulty: str = "medium",
+                 words: list | str | None = None, names: list | None = None, categories: list | None = None,
+                 suspects: list | None = None, weapons: list | None = None, rooms: list | None = None,
+                 titles: list | str | None = None, story_for: int | None = None, story: str | None = None,
+                 remove: int | None = None) -> str:
+    """Add puzzles to a puzzle book; they're made in code with exactly one answer and an answer
+    key at the back. type: wordsearch, sudoku, logic (logic grid) or whodunit (mystery case).
+    difficulty: easy, medium, hard. count: how many. wordsearch needs words: one list shared by
+    all (12-18 picked per puzzle) or a list of lists, one per puzzle (themes). logic: optional
+    names and categories [{"name": "Pet", "values": [...], "verb": "owns the {}"}]. whodunit:
+    optional suspects, weapons, rooms. titles: puzzle titles. story_for=N with story="..." adds
+    a short story or case file above puzzle N (the reply shows the setup, never the answer).
+    remove=N drops puzzle N."""
+    b, made = books.add_puzzles(title, type, count, difficulty, words, names, categories, suspects,
+                                weapons, rooms, titles, story_for, story, remove)
+    lines = [f"{p['n']}. " + book_puzzles_mod.public_view(p) for p in made]
+    head = (f"Added {len(made)} puzzles" if made else "Updated") + f"; the book has {len(b['puzzles'])}."
+    return head + ("\n" + "\n".join(lines) if lines else "") + "\nBuild with book_build when ready."
+
+
+@mcp.tool()
+@guarded("book_listing")
+def book_listing(title: str, description: str | None = None, keywords: list | str | None = None,
+                 categories: list | str | None = None, subtitle: str | None = None,
+                 back_text: str | None = None) -> str:
+    """The Amazon KDP listing kit: description (plain text or KDP's simple HTML: b, i, u, em,
+    strong, br, p, h4-h6, ul, ol, li; up to 4000 characters), 7 keywords (phrases buyers type; no
+    'bestseller', 'free' or 'Amazon'), up to 3 categories, a subtitle and back-cover text (about
+    150 words for 6x9). Saved into kdp/listing.md and printed on the cover at the next build."""
+    b, notes = books.set_listing(title, description, keywords, categories, subtitle, back_text)
+    L = b["listing"]
+    return (f"Listing saved: {len(L.get('description', ''))} character description, "
+            f"{len(L.get('keywords', []))} keywords, {len(L.get('categories', []))} categories."
+            + ("\n" + "\n".join(notes) if notes else ""))
+
+
+@mcp.tool()
+@guarded("book_build")
+def book_build(title: str, formats: str | None = None) -> str:
+    """Make the book's files in the background (returns a job id; check with studio_jobs):
+    epub, pdf (print-ready interior, also the KDP manuscript), kdp (wraparound paperback cover
+    sized to the page count, ebook cover and listing kit). Default: novels and ebooks epub+pdf+kdp,
+    picture books pdf+kdp+epub (draws the pictures first, about 30 s each), puzzle books pdf+kdp.
+    Unwritten chapters make a draft build. Files appear in the dashboard's Books tab."""
+    b = books.load(title)
+    fm = book_build_mod.formats_for(b, formats)
+    job = jobqueue.add("book", b["title"], {"title": b["title"], "formats": fm})
+    return f"Queued the build of '{b['title']}' ({', '.join(fm)}).\n{jobqueue.summary(job)}"
+
+
+@mcp.tool()
+@guarded("book_status")
+def book_status(title: str | None = None) -> str:
+    """Without title: every book project (kind, status, size). With title: its plan state,
+    outline/chapters with word counts (or puzzles), approval, and the files built so far."""
+    if title:
+        return books.describe(title)
+    rows = books.list_books()
+    if not rows:
+        return "No books yet. Start one with book_new."
+    return "\n".join(f"{r['title']} — {r['label']}, {r['status_text']}, "
+                     + (f"{r['puzzles']} puzzles" if r["kind"] == "puzzle" else f"{r['chapters']} parts, {r['words']} words")
+                     for r in rows)
+
+
 class BearerAuth:
     def __init__(self, app):
         self.app = app

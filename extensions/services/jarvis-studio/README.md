@@ -50,13 +50,26 @@ Timings on this computer: a 45 s music video about 18 s, a 30 s beat-cut edit wi
 
 **Whisper:** Lemonade's Vulkan build of whisper.cpp crashes on this machine, so jarvis-studio loads `Whisper-Small` with the CPU backend (`JARVIS_WHISPER_BACKEND=cpu`).
 
+## Book studio
+
+Novels, nonfiction ebooks, children's picture books and puzzle books. Hermes writes the words with the `book_*` tools; the studio keeps the project, makes the puzzles, draws picture-book pages and builds the files. Projects live in `~/Documents/Jarvis/books/<title>/` (`JARVIS_BOOKS_OUT`).
+
+- **Plan, then approve:** `book_new` → `book_plan` (story bible / ebook plan / character sheet, and an outline) → the user approves the outline (in chat, or **Approve outline** on the dashboard). `book_write` refuses until then.
+- **One chapter at a time:** `book_context` gives Hermes the plan, characters, outline, continuity notes and the end of the previous chapter, trimmed to about 22,000 characters so a small context window is enough. `book_write` saves the chapter with one or two lines of continuity notes; long chapters are saved in parts with `append=True`.
+- **Picture books:** one exact look sentence per character and one style line go into every page's picture prompt, with the same seed, through SD-Turbo (about 30 s a page, upscaled to 2400 px). Full-bleed pages with the text on a panel.
+- **Puzzle books:** word search, sudoku, logic grids and whodunit cases are made in code (`studio/books/puzzles.py`). Sudoku cells are removed only while the puzzle has one solution; for logic grids and cases a solver keeps adding true clues until exactly one answer is left, then drops every clue that isn't needed. Answer key at the back; tool replies never show the answers.
+- **Files (`book_build`, a background job):** a print-ready PDF (also the KDP manuscript: trim size, mirrored margins with KDP's inside margin for the real page count, page numbers, a contents page with page numbers for ebooks, padded to 24 pages), an EPUB 3, a Markdown manuscript, and in `kdp/` the wraparound paperback cover (spine width from page count and paper, spine text from 80 pages, barcode area left clear), a 1600x2560 ebook cover and `listing.md` (description in KDP's allowed HTML, 7 keywords, 3 categories, print settings). PDFs are printed by headless Google Chrome; page counts come from `pdfinfo`.
+- **Dashboard → Book studio:** start a book, read and edit the plan and outline, approve it, read or fix any chapter, see page pictures, add puzzles, build and open the files.
+
+Hermes tools: `book_new`, `book_plan`, `book_context`, `book_write`, `book_puzzles`, `book_listing`, `book_build`, `book_status`. Nothing is uploaded to KDP; the user publishes.
+
 ## Dashboard
 
 Open **http://127.0.0.1:7722**, or **Jarvis Studio** in the app menu. It runs as the `jarvis-studio-dashboard` user service and only answers on this computer.
 
 - **Status bar**: StemDeck, the Hermes MCP server, the Hermes container, Lemonade, Guitarix, OBS, Audacity, Ardour, playback, AI models and free disk space.
 - **Library**: every song in StemDeck with key, BPM and length. Pick one to see how present each part is. **Add a song** splits a file or link.
-- **Music / Video / Photo studio** switch. Music studio tabs, in order: **Create** (ACE-Step songs, MOSS-TTS speech), **Stems** (a mixer for the selected song: play every part in sync, mute/solo, set levels, save the mix to `~/Music/Jarvis/mixes` or export WAV stems to `~/Music/Jarvis/stems`), **DAW**, **AI remix**, **Practice**, **Karaoke** and **Sheet**. Video studio has the five video workflows plus **Captions**. Click a part to mute it, again to solo it.
+- **Music / Video / Photo / Book studio** switch. Music studio tabs, in order: **Create** (ACE-Step songs, MOSS-TTS speech), **Stems** (a mixer for the selected song: play every part in sync, mute/solo, set levels, save the mix to `~/Music/Jarvis/mixes` or export WAV stems to `~/Music/Jarvis/stems`), **DAW**, **AI remix**, **Practice**, **Karaoke** and **Sheet**. Video studio has the five video workflows plus **Captions**. Click a part to mute it, again to solo it.
 - **Rigs**: open Guitarix and switch presets; open OBS, change scene, start or stop recording (asks first).
 - **Jobs**: workflows run in the background (two at a time) with results and file buttons.
 - **Outputs**: recent files in `~/Music/Jarvis` and `~/Videos/Jarvis`. Preview audio, watch videos in a pop-up player, play on the computer speakers, open PDFs, thumbnails and timelines, or show in the folder.
@@ -102,6 +115,9 @@ Add the entry the script prints to `~/ods/data/hermes/config.yaml` under `mcp_se
 | Plugins | LSP Plugins and DrumGizmo (Ubuntu Studio packages); Surge XT 1.3.4 installed per user from its GitHub release (`~/.lv2`, `~/.vst3`, `~/.clap`, data in `~/.local/share/surge-xt`); DrumGizmo kit DRSKit in `~/Music/DrumGizmo/DRSKit`, set as DrumGizmo's default kit in `~/.config/drumgizmo/drumgizmo.conf` |
 
 ## Known limits
+
+- **Book pictures** come from SD-Turbo at 512 px, upscaled to 2400 px: fine on screen and in ebooks, soft in print at 8.5 in. Use your own pictures (`image=` per page) for a sharper print book. SD-Turbo sometimes adds fake lettering; draw that page again with `new_picture=True`.
+- **Chapters don't force a right-hand page** in the print PDF (Chrome ignores `break-before: right`); each chapter starts on a new page.
 
 - **Kdenlive** opens beat-cut edits through **File > Import > OpenTimelineIO**. The `.otio` files are checked with the OpenTimelineIO library, but the Kdenlive import itself hasn't been tried yet.
 - **AI video generation** isn't practical here: there's no NVIDIA GPU. The video tools edit, compose and caption your own footage and the studio's audio.

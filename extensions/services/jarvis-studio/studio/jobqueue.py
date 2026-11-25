@@ -139,7 +139,7 @@ def summary(job: dict) -> str:
 
 
 # --- worker (MCP server only) -------------------------------------------------
-KNOWN_KINDS = {"explainer": "Explainer video", "explainer_redo": "Explainer scene redo"}
+KNOWN_KINDS = {"explainer": "Explainer video", "explainer_redo": "Explainer scene redo", "book": "Book"}
 
 
 def _run_one(job: dict) -> None:
