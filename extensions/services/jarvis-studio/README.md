@@ -37,11 +37,14 @@ Built on ffmpeg (hardware H.264 on the Intel GPU through VAAPI), Inkscape for ti
 | V3 | **Beat-cut edit**: a folder of clips and photos cut every 2, 4 or 8 beats, plus an `.otio` timeline for Kdenlive | "Cut my trip videos to *song*, fast, 30 seconds" | `jarvis-studio edit ~/Videos/trip "song" --pace fast --max 30` |
 | V4 | **Shorts**: 9:16, 1:1 and 16:9 clips of the chorus or loudest part, with captions, -14 LUFS audio and thumbnails. Never posts | "Make a 30 second Short and a square clip from this video" | `jarvis-studio shorts video.mp4 --platforms shorts,square --seconds 30` |
 | V5 | **Narrated video**: MOSS-TTS reads your script, one slide or photo per paragraph, captions from the script, music ducked under the voice | "Make a video explaining how this song was made" | `jarvis-studio narrate script.txt "Title" --music "song"` |
+| V6 | **Explainer** (any length, background job): scene by scene with a Kokoro voice (or MOSS), a picture, photo or slide per scene, chapter cards, captions, `chapters.txt` for YouTube and a thumbnail. Each scene's voice, picture and clip is kept, so fixing one scene only remakes that scene. Jobs queue and run one after another | "Make a 10-minute explainer about how stems help you practice" | dashboard **Video → Explainer** |
 | + | **Captions**: Whisper subtitles (`.srt`) for any video, optionally burned in | "Caption this video" | `jarvis-studio captions talk.mp4 --style pop` |
 
-Hermes tools: `video_music_video`, `video_perform_start`, `video_perform_finish`, `video_performance`, `video_obs_scene`, `video_auto_edit`, `video_shorts`, `video_narrated` and `video_captions`. The dashboard has the same forms under **Video studio**.
+Hermes tools: `video_music_video`, `video_perform_start`, `video_perform_finish`, `video_performance`, `video_obs_scene`, `video_auto_edit`, `video_shorts`, `video_narrated`, `video_explainer`, `video_explainer_scene` and `video_captions`, plus `studio_jobs` and `studio_job_cancel` for the background queue. The dashboard has the same forms under **Video studio**.
 
-Timings on this computer: a 45 s music video about 18 s, a 30 s beat-cut edit with 20 cuts about 8 s, a 3-paragraph narrated video about 35 s, a 10 s caption job about 10 s.
+Timings on this computer: a 45 s music video about 18 s, a 30 s beat-cut edit with 20 cuts about 8 s, a 3-paragraph narrated video about 35 s, a 10 s caption job about 10 s. An explainer with text slides takes about 1 s of work per second of video; each new picture adds about 30 s, so a 10-minute explainer with a picture per scene is roughly 45-75 minutes.
+
+**Background queue:** long jobs are JSON files in `~/.local/state/jarvis-studio/queue` (or `JARVIS_STUDIO_STATE`); the MCP server runs them one at a time, oldest first, even with no chat open. A tool call returns a job id straight away instead of holding the connection. Jobs that were running when the server restarted are marked interrupted; run them again and finished scenes are reused. Explainer projects live in `~/Videos/Jarvis/explainers/<title>/` (`project.json` is the plan; `cache/` holds the scene pieces).
 
 **Camera:** OBS starts with an empty scene. Run `jarvis-studio obs-scene` (or **Set up camera scene** in the dashboard) once to add a "Jarvis Performance" scene with `/dev/video0` and the default microphone. It turns the camera on.
 

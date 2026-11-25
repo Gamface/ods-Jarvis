@@ -34,6 +34,8 @@ from studio import audio, guitarix, obs
 from studio import stemdeck as sd
 from studio import workflows as wf
 from studio.video import workflows as vwf
+from studio import jobqueue
+from studio.video import explainer
 from studio.video.common import VIDEO_OUT, vaapi_ok
 from studio.config import (safe_name, ACESTEP_DIR, BASIC_PITCH, MOSS_DIR, OUT_ROOT, STEMDECK_URL,
                            out_dir)
@@ -352,7 +354,8 @@ def recent_outputs(limit: int = 100) -> list[dict]:
                 files.append(p)
     if VIDEO_OUT.exists():
         for p in VIDEO_OUT.rglob("*"):
-            if "/segments/" in str(p) or "/stems/" in str(p) or not p.is_file():
+            if "/segments/" in str(p) or "/stems/" in str(p) or "/cache/" in str(p) \
+                    or p.name.startswith(".") or not p.is_file():
                 continue
             if p.suffix.lower() in VIDEO_SHOW or (p.suffix == ".png" and p.name.startswith("thumbnail")):
                 files.append(p)
@@ -418,6 +421,42 @@ async def api_jobs(request):
 async def api_run(request):
     data = await body(request)
     return ok(start_job(data.get("workflow", ""), data.get("args") or {}))
+
+
+async def api_queue(request):
+    """Background queue (run by the studio MCP server) and explainer projects."""
+    projects = explainer.list_projects()
+    videos = {pr["title"]: pr["video"] for pr in projects}
+    jobs = [dict(j, video=videos.get(j["title"])) for j in jobqueue.list_jobs(40)]
+    return ok(jobs=jobs, projects=projects[:30])
+
+
+async def api_queue_add(request):
+    data = await body(request)
+    music = data.get("music") or None
+    proj = explainer.create(data.get("title", ""), data.get("script") or None, None,
+                            data.get("aspect") or "16:9", data.get("voice") or None,
+                            float(data.get("voice_speed") or 1.0), music,
+                            data.get("style") or None, None, True)
+    job = jobqueue.add("explainer", proj["title"], {"title": proj["title"]}, via="dashboard")
+    audit("queue_add", title=proj["title"], scenes=len(proj["scenes"]))
+    return ok(job=job, scenes=len(proj["scenes"]), message=f"Queued '{proj['title']}' ({len(proj['scenes'])} scenes)")
+
+
+async def api_queue_action(request):
+    data = await body(request)
+    jid, action = data.get("id", ""), data.get("action")
+    if action == "cancel":
+        job = jobqueue.cancel(jid)
+    elif action == "retry":
+        job = jobqueue.retry(jid)
+    elif action == "rebuild":
+        title = explainer._load(data.get("title", ""))["title"]
+        job = jobqueue.add("explainer", title, {"title": title}, via="dashboard")
+    else:
+        raise ValueError("action must be cancel, retry or rebuild")
+    audit("queue_" + action, id=jid or job["id"])
+    return ok(job=job, message=jobqueue.summary(job).split("\n")[0])
 
 
 async def api_stop(request):
@@ -668,6 +707,9 @@ routes = [
     Route("/api/guitarix", api_guitarix, methods=["GET", "POST"]),
     Route("/api/obs", api_obs, methods=["GET", "POST"]),
     Route("/api/outputs", api_outputs),
+    Route("/api/queue", api_queue),
+    Route("/api/queue/add", api_queue_add, methods=["POST"]),
+    Route("/api/queue/action", api_queue_action, methods=["POST"]),
     Route("/api/photos", api_photos),
     Route("/api/photos/upload", api_photos_upload, methods=["POST"]),
     Route("/api/photos/import", api_photos_import, methods=["POST"]),

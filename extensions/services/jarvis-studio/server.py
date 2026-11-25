@@ -320,6 +320,83 @@ def video_captions(video: str, style: str = "bottom", burn: bool = True,
     return vwf.captions(video, style, burn, language)
 
 
+# --- long explainers and the background queue ---------------------------------
+from studio import jobqueue  # noqa: E402
+from studio.video import explainer  # noqa: E402  (registers the "explainer" job)
+
+
+def _estimate(proj: dict) -> str:
+    n = len(proj["scenes"])
+    pics = sum(1 for s in proj["scenes"] if not s.get("image") and (s.get("picture") or proj.get("style")))
+    words = sum(len(s["say"].split()) for s in proj["scenes"])
+    mins = (words / 150 * 0.7 * 60 + pics * 30 + n * 8 + words / 150 * 60 * 0.6) / 60
+    return (f"{n} scenes, about {words / 150 / proj['voice_speed']:.1f} min of narration, "
+            f"{pics} new pictures to make; roughly {max(1, round(mins))} min of work if nothing is cached")
+
+
+@mcp.tool()
+@guarded("video_explainer")
+def video_explainer(title: str, script: str | None = None, scenes: list | str | None = None,
+                    aspect: str = "16:9", voice: str | None = None, voice_speed: float = 1.0,
+                    music: str | None = None, style: str | None = None, seed: int | None = None,
+                    intro: bool = True) -> str:
+    """Long explainer video (any length), made in the background. Returns a job id at once;
+    check it with studio_jobs. Best: pass scenes, a list of {"say": narration (about 1-3
+    sentences), "picture": image prompt (no text in it), "text": slide text if no picture,
+    "image": existing picture/clip path, "chapter": section title shown as a card and listed as
+    a YouTube chapter}. Or pass script: plain text, "# Heading" lines start chapters, split into
+    ~10 s scenes. style (e.g. "clean flat illustration, soft colours") makes a picture for every
+    scene without one; otherwise those scenes are text slides. voice: a Kokoro voice
+    (bm_george default, af_heart, am_michael, bf_emma...), "moss", or a WAV to clone.
+    voice_speed 1.0 normal. music: StemDeck song or audio file, ducked under the voice.
+    Same title again reuses every unchanged scene, so it's fast to fix and rebuild."""
+    proj = explainer.create(title, script, scenes, aspect, voice, voice_speed, music, style, seed, intro)
+    job = jobqueue.add("explainer", proj["title"], {"title": proj["title"]})
+    return (f"Queued explainer '{proj['title']}': {_estimate(proj)}.\n{jobqueue.summary(job)}\n"
+            "Check progress with studio_jobs(job_id). It appears in the dashboards when done.")
+
+
+@mcp.tool()
+@guarded("video_explainer_scene")
+def video_explainer_scene(title: str, scene: int | None = None, say: str | None = None,
+                          picture: str | None = None, image: str | None = None, text: str | None = None,
+                          chapter: str | None = None, new_picture: bool = False, remove: bool = False,
+                          rebuild: bool = True) -> str:
+    """See or fix one scene of an explainer. Without scene: lists every scene (number, words,
+    visual). With scene (1-based): change its say/picture/image/text/chapter ("" clears a
+    field), new_picture=True for a different picture from the same prompt, remove=True to drop
+    it. rebuild=True queues a rebuild that only remakes what changed."""
+    if scene is None:
+        return explainer.describe(title)
+    explainer.update_scene(title, scene, say, picture, image, text, chapter, new_picture, remove)
+    if not rebuild:
+        return f"Scene {scene} updated (not rebuilt yet).\n" + explainer.describe(title)
+    job = jobqueue.add("explainer", title, {"title": explainer._load(title)["title"]})
+    return f"Scene {scene} updated; rebuilding only what changed.\n{jobqueue.summary(job)}"
+
+
+@mcp.tool()
+@guarded("jobs")
+def studio_jobs(job_id: str | None = None) -> str:
+    """Background job status. With job_id: that job (progress, step, result or problem).
+    Without: the queue and recent jobs, newest first."""
+    if job_id:
+        return jobqueue.summary(jobqueue.get(job_id))
+    jobs = jobqueue.list_jobs(15)
+    if not jobs:
+        return "No background jobs yet."
+    return "\n".join(jobqueue.summary(j).split("\n")[0] for j in jobs)
+
+
+@mcp.tool()
+@guarded("job_cancel")
+def studio_job_cancel(job_id: str, run_again: bool = False) -> str:
+    """Cancel a queued or running job (a running one stops after its current step; finished
+    scenes are kept). run_again=True puts a failed or cancelled job back in the queue."""
+    job = jobqueue.retry(job_id) if run_again else jobqueue.cancel(job_id)
+    return jobqueue.summary(job)
+
+
 class BearerAuth:
     def __init__(self, app):
         self.app = app
@@ -341,4 +418,5 @@ class BearerAuth:
 
 
 if __name__ == "__main__":
+    jobqueue.start_worker()
     uvicorn.run(BearerAuth(mcp.streamable_http_app()), host=BIND, port=PORT)

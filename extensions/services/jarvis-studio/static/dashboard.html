@@ -151,6 +151,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .pill.running, .pill.queued { background: var(--accent-soft); color: var(--accent); }
 .pill.done { background: var(--ok-soft); color: var(--ok); }
 .pill.failed { background: var(--bad-soft); color: var(--bad); }
+.meter { height: 4px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+.sub-h { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin: 18px 0 8px; font-weight: 650; }
 .progress { height: 3px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
 .progress i { display: block; height: 100%; width: 40%; background: var(--accent); animation: slide 1.4s ease-in-out infinite; }
 @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
@@ -487,6 +490,7 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
         <button class="tab" data-tab="v3" role="tab"><span class="num">3</span>Beat-cut</button>
         <button class="tab" data-tab="v4" role="tab"><span class="num">4</span>Shorts</button>
         <button class="tab" data-tab="v5" role="tab"><span class="num">5</span>Narrate</button>
+        <button class="tab" data-tab="vb" role="tab"><span class="num">6</span>Explainer</button>
         <button class="tab" data-tab="vc" role="tab"><span class="num">+</span>Captions</button>
       </nav>
 
@@ -599,6 +603,31 @@ dialog.viewer .vbar { display: flex; justify-content: space-between; align-items
             <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
         </div>
         <div class="actions"><button class="btn primary" data-run="v_narrated">Make narrated video</button><span class="hint">About 10 s per paragraph.</span></div>
+      </div>
+
+      <div class="pane" id="pane-vb">
+        <p class="pane-intro">Long explainers (any length) made in the background, scene by scene: Kokoro voice, a picture or slide per scene, captions, chapter cards and YouTube chapters. Add several and they run one after another, even with this page closed. Fixing one scene later only remakes that scene.</p>
+        <div class="field"><label class="f" for="exTitle">Title</label><input type="text" id="exTitle" placeholder="How stems help you practice"></div>
+        <div class="field"><label class="f" for="exScript">Script <span class="hint">blank line between paragraphs · a line starting with # starts a chapter · long paragraphs become ~10 s scenes</span></label>
+          <textarea id="exScript" style="min-height:180px" placeholder="# Why stems matter&#10;Every song you love is built from layers…&#10;&#10;# How to practice&#10;Mute the part you play…"></textarea></div>
+        <div class="row">
+          <div class="field"><label class="f" for="exStyle">Picture style <span class="hint">blank = text slides (fastest)</span></label><input type="text" id="exStyle" placeholder="clean flat illustration, soft colours, no text"></div>
+          <div class="field"><label class="f" for="exVoice">Voice</label>
+            <select id="exVoice"><option value="bm_george" selected>George (British, male)</option><option value="bf_emma">Emma (British, female)</option><option value="am_michael">Michael (American, male)</option><option value="af_heart">Heart (American, female)</option><option value="moss">MOSS (slower)</option></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="f" for="exSpeed">Voice speed <span class="hint" id="exSpeedVal">1.00×</span></label>
+            <input type="range" id="exSpeed" min="0.7" max="1.6" step="0.05" value="1" aria-describedby="exSpeedVal"></div>
+          <div class="field"><label class="f" for="exMusic">Music bed</label>
+            <select id="exMusic"><option value="" selected>None</option><option value="__song">Selected song (no vocals)</option></select></div>
+          <div class="field"><label class="f">Shape</label><div class="seg aspect" id="exAspect" data-value="16:9">
+            <button data-v="16:9" class="on">16:9</button><button data-v="9:16">9:16</button><button data-v="1:1">1:1</button></div></div>
+        </div>
+        <div class="actions"><button class="btn primary" id="exAdd" type="button">Add to queue</button><span class="hint">Roughly 30 s per picture plus 1 s of work per second of video.</span></div>
+        <h3 class="sub-h">Queue</h3>
+        <div id="qList" class="jobs"></div>
+        <h3 class="sub-h">Explainer projects</h3>
+        <div id="exProjects" class="jobs"></div>
       </div>
 
       <div class="pane" id="pane-vc">
@@ -882,6 +911,7 @@ $$(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick 
 const segVal = sel => $(sel).dataset.value;
 $("#shSource").addEventListener("change", () => $("#shFileWrap").hidden = segVal("#shSource") !== "file");
 $("#nrMusic").onchange = e => $("#nrMusicFileWrap").hidden = e.target.value !== "__file";
+$("#exSpeed").oninput = e => $("#exSpeedVal").textContent = Number(e.target.value).toFixed(2) + "×";
 $("#nrSpeed").oninput = e => $("#nrSpeedVal").textContent = Number(e.target.value).toFixed(2) + "×";
 bindVal("#pfKey", "#pfKeyV", v => (v > 0 ? "+" : "") + v + " st");
 
@@ -1015,6 +1045,59 @@ function renderJob(j) {
   return card;
 }
 
+/* explainer queue */
+function renderQueueJob(j) {
+  const pct = Math.round((j.progress || 0) * 100);
+  const when = j.finished || j.started || j.created;
+  const card = el("div", { class: "job" },
+    el("div", { class: "job-h" }, el("b", { text: j.title }), el("span", { class: "pill " + (j.status === "cancelled" ? "failed" : j.status), text: j.status })),
+    el("div", { class: "sub", text: `${j.label} · ${j.step || ""}${j.status === "running" ? ` · ${pct}%` : ""} · ${(when || "").replace("T", " ").slice(5, 16)}${j.via ? " · via " + j.via : ""}` }));
+  if (j.status === "running") card.append(el("div", { class: "meter" }, el("i", { style: `width:${pct}%` })));
+  if (j.error) card.append(el("div", { class: "result", text: "Problem: " + j.error }));
+  const acts = [];
+  if (j.status === "queued" || j.status === "running") acts.push(el("button", { class: "btn sm", type: "button", text: j.status === "running" ? "Stop" : "Cancel", onclick: () => queueAction({ id: j.id, action: "cancel" }) }));
+  if (j.status === "failed" || j.status === "cancelled") acts.push(el("button", { class: "btn sm", type: "button", text: "Run again", onclick: () => queueAction({ id: j.id, action: "retry" }) }));
+  if (j.status === "done") {
+    const f = j.video && state.outputs.find(o => o.abs === j.video);
+    if (f) acts.push(el("button", { class: "btn sm", type: "button", text: "Watch", onclick: () => watch(f) }));
+  }
+  if (acts.length) card.append(el("div", { class: "actions" }, ...acts));
+  return card;
+}
+function renderProject(p) {
+  const f = p.video && state.outputs.find(o => o.abs === p.video);
+  return el("div", { class: "job" },
+    el("div", { class: "job-h" }, el("b", { text: p.title }), el("span", { class: "hint", text: `${p.scenes} scenes · ${p.aspect}` })),
+    el("div", { class: "actions" },
+      f ? el("button", { class: "btn sm", type: "button", text: "Watch", onclick: () => watch(f) }) : el("span", { class: "hint", text: "not finished yet" }),
+      el("button", { class: "btn sm", type: "button", text: "Rebuild", title: "Put the video together again (only changed scenes are remade)", onclick: () => queueAction({ action: "rebuild", title: p.title }) }),
+      p.video ? el("button", { class: "btn sm", type: "button", text: "Show in folder", onclick: () => api("/api/open", { path: "video/explainers/" + p.video.split("/explainers/")[1] }).then(r => toast(r.message)).catch(e => toast(e.message, true)) }) : null));
+}
+async function loadQueue() {
+  let q; try { q = await api("/api/queue"); } catch { return; }
+  const prev = state.queueStatus || {};
+  state.queueStatus = Object.fromEntries(q.jobs.map(j => [j.id, j.status]));
+  for (const j of q.jobs) if (prev[j.id] && prev[j.id] !== j.status && j.status === "done") { toast(`Explainer ready: ${j.title}`); loadOutputs(); }
+  $("#qList").replaceChildren(...(q.jobs.length ? q.jobs.slice(0, 20).map(renderQueueJob) : [el("div", { class: "empty", text: "Nothing queued yet." })]));
+  $("#exProjects").replaceChildren(...(q.projects.length ? q.projects.map(renderProject) : [el("div", { class: "empty", text: "No explainers yet." })]));
+}
+async function queueAction(data) {
+  try { const r = await api("/api/queue/action", data); toast(r.message); } catch (e) { toast(e.message, true); }
+  loadQueue();
+}
+$("#exAdd").onclick = async () => {
+  const title = $("#exTitle").value.trim(), script = $("#exScript").value.trim();
+  if (!title || !script) return toast("Give it a title and a script.", true);
+  let music = "";
+  if ($("#exMusic").value === "__song") { if (!needSong()) return; music = state.song.job_id; }
+  try {
+    const r = await api("/api/queue/add", { title, script, style: $("#exStyle").value.trim(), voice: $("#exVoice").value,
+      voice_speed: Number($("#exSpeed").value), music, aspect: segVal("#exAspect") });
+    toast(r.message);
+  } catch (e) { toast(e.message, true); }
+  loadQueue();
+};
+
 /* outputs */
 const IMG_PRESETS = ["album cover, ", "gig poster, ", "video thumbnail, ", "stage backdrop, ", "concept art, "];
 $("#imPresets").replaceChildren(...IMG_PRESETS.map(p => el("button", { class: "btn sm", type: "button", text: p.replace(", ", ""),
@@ -1055,8 +1138,8 @@ function preview(f) {
   $("#nowName").textContent = f.name; $("#nowSub").textContent = f.song || f.kind || "";
 }
 const KINDS = { all: "All", songs: "Songs", practice: "Practice", sessions: "DAW", karaoke: "Karaoke", productions: "Productions", "sheet-music": "Sheet music", generated: "Generated", speech: "Speech", mixes: "Mixes", images: "Pictures",
-  "music-videos": "Music videos", performances: "Performances", edits: "Edits", shorts: "Shorts", narrated: "Narrated", captions: "Captions" };
-const VIDEO_KINDS = new Set(["music-videos", "performances", "edits", "shorts", "narrated", "captions"]);
+  "music-videos": "Music videos", performances: "Performances", edits: "Edits", shorts: "Shorts", narrated: "Narrated", explainers: "Explainers", captions: "Captions" };
+const VIDEO_KINDS = new Set(["music-videos", "performances", "edits", "shorts", "narrated", "explainers", "captions"]);
 async function loadOutputs() {
   try { state.outputs = await api("/api/outputs"); } catch { return; }
   const present = new Set(state.outputs.map(f => f.kind));
@@ -1297,6 +1380,8 @@ async function boot() {
   setInterval(loadRigs, 6000);
   setInterval(loadJobs, 2000);
   setInterval(() => { loadOutputs(); loadActivity(); }, 12000);
+  loadQueue();
+  setInterval(() => { if (!document.hidden) loadQueue(); }, 5000);
   setInterval(() => { if (!document.hidden) loadSongs(); }, 30000);
 }
 boot();

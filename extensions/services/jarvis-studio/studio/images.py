@@ -43,24 +43,21 @@ def _unique(path):
     return path
 
 
-def make_image(prompt: str, title: str | None = None, size: str = "512x512",
-               model: str | None = None, seed: int | None = None, keep_loaded: bool = False) -> str:
-    prompt = (prompt or "").strip()
-    if not prompt:
-        raise ValueError("Describe the picture (subject, style, mood, colours).")
-    if len(prompt) > 1000:
-        raise ValueError("Keep the prompt under 1000 characters.")
-    if size not in SIZES:
-        raise ValueError(f"size must be one of {', '.join(sorted(SIZES))}")
-    model = model or DEFAULT_MODEL
-    if model not in MODELS:
-        raise ValueError(f"model must be one of {', '.join(sorted(MODELS))}")
-    title = (title or prompt.split(",")[0])[:60]
+def unload(model: str | None = None) -> None:
+    """Free the memory the image model holds in Lemonade."""
+    try:
+        httpx.post(f"{LEMONADE}/api/v1/unload", json={"model_name": model or DEFAULT_MODEL}, timeout=30)
+    except httpx.HTTPError:
+        pass
 
+
+def generate_png(prompt: str, size: str = "512x512", model: str | None = None,
+                 seed: int | None = None, keep_loaded: bool = False) -> bytes:
+    """One picture from Lemonade as PNG bytes (no files written)."""
+    model = model or DEFAULT_MODEL
     body = {"model": model, "prompt": prompt, "size": size, "n": 1, "response_format": "b64_json"}
     if seed is not None:
         body["seed"] = int(seed)
-    started = datetime.datetime.now()
     with heavy_job("image"):
         try:
             with httpx.Client(timeout=900) as c:
@@ -79,6 +76,26 @@ def make_image(prompt: str, title: str | None = None, size: str = "512x512",
                         pass
         except httpx.HTTPError as e:
             raise RuntimeError(f"Lemonade is not answering at {LEMONADE}: {e}") from e
+
+    return png
+
+
+def make_image(prompt: str, title: str | None = None, size: str = "512x512",
+               model: str | None = None, seed: int | None = None, keep_loaded: bool = False) -> str:
+    prompt = (prompt or "").strip()
+    if not prompt:
+        raise ValueError("Describe the picture (subject, style, mood, colours).")
+    if len(prompt) > 1000:
+        raise ValueError("Keep the prompt under 1000 characters.")
+    if size not in SIZES:
+        raise ValueError(f"size must be one of {', '.join(sorted(SIZES))}")
+    model = model or DEFAULT_MODEL
+    if model not in MODELS:
+        raise ValueError(f"model must be one of {', '.join(sorted(MODELS))}")
+    title = (title or prompt.split(",")[0])[:60]
+
+    started = datetime.datetime.now()
+    png = generate_png(prompt, size, model, seed, keep_loaded)
 
     dest = _unique(out_dir("images") / f"{safe_name(title)}.png")
     dest.write_bytes(png)
