@@ -17,6 +17,8 @@ Jarvis is a set of extensions for [ODS](https://github.com/Osmantic/ODS) that le
 
 - `extensions/services/jarvis-studio/` is a music studio for Hermes. It connects StemDeck, Audacity, Ardour, Guitarix, OBS, ACE-Step, MOSS-TTS-Nano and basic-pitch with MuseScore through five music workflows (practice, DAW sessions, karaoke, AI re-production, sheet music) and six video workflows (music videos, performance videos, beat-cut edits, shorts, narrated videos, long explainers with a background queue) plus captions, and a book studio (novels, nonfiction ebooks, picture books and puzzle books, built as EPUB, print PDF and Amazon KDP paperback files). It has a local dashboard at http://127.0.0.1:7722. See its [README](extensions/services/jarvis-studio/README.md) and the [24-agent studio layout](extensions/services/jarvis-studio/agents/README.md).
 
+- `extensions/services/jarvis-vault-sync/` keeps the Agentic Memory vault on the NAS in two-way sync with `/opt/data/vault`, so Jarvis can read and write your notes there. See its [README](extensions/services/jarvis-vault-sync/README.md).
+
 ## Safety model
 
 - Shell commands outside a read-only allowlist need your approval before they run. The prompt appears as a popup on the computer or a notification on your phone.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Jarvis: two-way sync of the NAS Agentic Memory vault with ~/ods/data/hermes/vault (/opt/data/vault for Hermes)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Documents/ODS/jarvis/extensions/services/jarvis-vault-sync
+ExecStart=%h/ods/data/jarvis-studio/venv/bin/python vault_sync.py
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=default.target
