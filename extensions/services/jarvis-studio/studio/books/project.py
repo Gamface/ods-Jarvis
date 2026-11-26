@@ -119,7 +119,8 @@ def create(title: str, kind: str, brief: str = "", audience: str = "", author: s
 
 def set_plan(title: str, plan: str | None = None, outline=None, characters=None, style: str | None = None,
              cover: str | None = None, dedication: str | None = None, author: str | None = None,
-             subtitle: str | None = None, target_words: int | None = None, approve: bool = False) -> dict:
+             subtitle: str | None = None, target_words: int | None = None, approve: bool = False,
+             cover_colors=None) -> dict:
     b = load(title)
     if plan is not None:
         b["plan"] = plan.strip()[:20_000]
@@ -133,6 +134,12 @@ def set_plan(title: str, plan: str | None = None, outline=None, characters=None,
         b["style"] = style.strip()[:400]
     if cover is not None:
         b.setdefault("cover", {})["picture"] = cover.strip()[:600]
+    if cover_colors is not None:
+        colors = _clean_colors(cover_colors)
+        if colors:
+            b.setdefault("cover", {})["colors"] = colors
+        else:
+            b.setdefault("cover", {}).pop("colors", None)  # back to the title's colours
     if dedication is not None:
         b["dedication"] = dedication.strip()[:600]
     if author is not None:
@@ -156,6 +163,27 @@ def set_plan(title: str, plan: str | None = None, outline=None, characters=None,
         b["approved"], b["approved_at"] = True, _now()
     save(b)
     return b
+
+
+def _clean_colors(colors) -> list[str]:
+    """[background, accent, text] as #rrggbb. Takes a list or "#111, #222, #333"; #rgb is widened.
+    Empty means none (use the title's colours)."""
+    if isinstance(colors, str):
+        colors = [c for c in re.split(r"[\s,;]+", colors.strip()) if c]
+    if not colors:
+        return []
+    out = []
+    for c in colors if isinstance(colors, (list, tuple)) else [colors]:
+        raw = str(c).strip()
+        c = raw if raw.startswith("#") else "#" + raw
+        if re.fullmatch(r"#[0-9a-fA-F]{3}", c):
+            c = "#" + "".join(ch * 2 for ch in c[1:])
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", c):
+            raise ValueError(f'cover_colors: "{raw}" is not a hex colour. Give three, e.g. ["#101820", "#f2aa4c", "#ffffff"].')
+        out.append(c.lower())
+    if len(out) != 3:
+        raise ValueError(f"cover_colors needs exactly 3 colours [background, accent, text]; got {len(out)}.")
+    return out
 
 
 def approve(title: str, ok: bool = True) -> dict:
