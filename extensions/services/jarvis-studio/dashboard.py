@@ -574,6 +574,26 @@ async def api_open(request):
     return ok(message=f"Opened {target.name or target}")
 
 
+async def api_trash(request):
+    """Move one output file to the desktop Trash (recoverable). Only files under the music and
+    video output folders; a picture's prompt note (.txt) goes with it."""
+    data = await body(request)
+    rel = str(data.get("path") or "")
+    if rel.partition("/")[0] not in ("music", "video"):
+        raise ValueError("Only files in the Outputs list can be moved to the Trash here")
+    p = _safe_path(rel)
+    if not p.is_file():
+        raise ValueError(f"{p.name} is a folder, not a file")
+    audit("output_trash", path=rel)
+    extra = [p.with_suffix(".txt")] if p.suffix.lower() in (".png", ".jpg") and "/images/" in str(p) else []
+    for f in [p, *extra]:
+        if f.exists():
+            r = subprocess.run(["gio", "trash", str(f)], capture_output=True, text=True)
+            if r.returncode != 0:
+                raise RuntimeError(f"Could not move {f.name} to the Trash: {(r.stderr or '').strip()[-200:]}")
+    return ok(message=f"Moved {p.name} to the Trash")
+
+
 # --- photo studio ---------------------------------------------------------
 PHOTOS = OUT_ROOT / "images"          # AI pictures land here (studio_make_image)
 MY_PHOTOS = PHOTOS / "my-photos"      # photos you add by hand
@@ -797,6 +817,7 @@ routes = [
     Route("/api/stop", api_stop, methods=["POST"]),
     Route("/api/play", api_play, methods=["POST"]),
     Route("/api/open", api_open, methods=["POST"]),
+    Route("/api/trash", api_trash, methods=["POST"]),
     Route("/api/guitarix", api_guitarix, methods=["GET", "POST"]),
     Route("/api/obs", api_obs, methods=["GET", "POST"]),
     Route("/api/outputs", api_outputs),
