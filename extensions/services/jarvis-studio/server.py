@@ -471,18 +471,38 @@ def book_context(title: str, chapter: int | None = None) -> str:
     return books.context(title, chapter)
 
 
+BOOK_INBOX = Path(os.environ.get("JARVIS_BOOK_INBOX", Path.home() / "ods/data/hermes/books-inbox"))
+
+
+def _book_inbox_text(text_file: str) -> str:
+    """Read chapter text Jarvis saved with write_file. /opt/data is Hermes's view of
+    ~/ods/data/hermes; only files in the books-inbox folder are read."""
+    BOOK_INBOX.mkdir(parents=True, exist_ok=True)
+    p = BOOK_INBOX / Path(text_file.strip()).name  # only the inbox; the folder part is ignored
+    if not p.is_file():
+        raise ValueError(f"No file {p.name} in /opt/data/books-inbox/. Write it there with write_file first.")
+    if p.stat().st_size > 400_000:
+        raise ValueError("text_file is too big for one chapter.")
+    return p.read_text(encoding="utf-8", errors="replace")
+
+
 @mcp.tool()
 @guarded("book_write")
 def book_write(title: str, chapter: int | None = None, text: str = "", notes: str | None = None,
                append: bool = False, chapter_title: str | None = None, picture: str | None = None,
-               image: str | None = None, new_picture: bool = False, pages: list | None = None) -> str:
+               image: str | None = None, new_picture: bool = False, pages: list | None = None,
+               text_file: str | None = None) -> str:
     """Save a chapter (or picture-book page) after the outline is approved. text: plain text,
     blank line between paragraphs, no chapter heading (## for sub-headings in ebooks). notes:
     one or two lines of continuity facts for later chapters. append=True adds to what's there
     (for long chapters written in parts); without it the text replaces the chapter. Picture
     books: picture = one sentence of what the page shows, using the characters' names (no words
     in pictures); image = an existing picture file instead; new_picture=True draws it again; or
-    pages = [{"text", "picture"}, ...] for every page at once."""
+    pages = [{"text", "picture"}, ...] for every page at once. Long chapters (lots of dialogue or
+    quotes): first write the text with write_file to /opt/data/books-inbox/<name>.md, then pass
+    text_file="/opt/data/books-inbox/<name>.md" instead of text, so the quotes can't break the call."""
+    if text_file:
+        text = _book_inbox_text(text_file)
     if pages:
         b = books.write_pages(title, pages)
         return f"Saved {len(pages)} pages.\n" + books.describe(title)
