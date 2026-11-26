@@ -65,6 +65,14 @@ def palette(title: str) -> tuple[str, str, str]:
     return sets[int(hashlib.sha1(title.encode()).hexdigest(), 16) % len(sets)]
 
 
+def book_colors(book: dict) -> tuple[str, str, str]:
+    """The book's cover colours: cover.colors [background, accent, text] if set, else palette()."""
+    c = (book.get("cover") or {}).get("colors")
+    if isinstance(c, (list, tuple)) and len(c) == 3 and all(re.fullmatch(r"#[0-9a-fA-F]{6}", str(x)) for x in c):
+        return tuple(c)
+    return palette(book["title"])
+
+
 # --- interiors -------------------------------------------------------------------
 def _base_css(book: dict, m: dict | None, bleed: bool) -> str:
     w, h = TRIMS[book["trim"]]
@@ -152,7 +160,7 @@ def picture_html(book: dict, pictures: dict[int, Path], pad_to: int = 0, cover_p
     from .project import chapter_rows
     w, h = TRIMS[book["trim"]]
     pw, ph = w + kdp.BLEED, h + 2 * kdp.BLEED
-    bg, accent, fg = palette(book["title"])
+    bg, accent, fg = book_colors(book)
     css = _base_css(book, None, True) + f"""
 .pg {{ width: {pw}in; height: {ph}in; position: relative; overflow: hidden; break-after: page; }}
 .pg img.full {{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }}
@@ -321,7 +329,7 @@ table {{ border-collapse: collapse; margin: 0 auto; }}
 # --- cover --------------------------------------------------------------------------
 def cover_html(book: dict, size: dict, front_pic: Path | None) -> str:
     L = book.get("listing", {})
-    bg, accent, fg = palette(book["title"])
+    bg, accent, fg = book_colors(book)
     W, H, S = size["width"], size["height"], size["spine"]
     b = kdp.BLEED
     tw = size["trim_w"]
