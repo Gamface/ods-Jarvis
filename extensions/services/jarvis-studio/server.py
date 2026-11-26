@@ -444,15 +444,19 @@ def book_new(title: str, kind: str = "novel", brief: str = "", audience: str = "
 def book_plan(title: str, plan: str | None = None, outline: list | str | None = None,
               characters: dict | str | None = None, style: str | None = None, cover: str | None = None,
               dedication: str | None = None, author: str | None = None, subtitle: str | None = None,
-              target_words: int | None = None, approve: bool = False) -> str:
+              target_words: int | None = None, approve: bool = False,
+              cover_colors: list | str | None = None) -> str:
     """Save the book's plan and outline. plan: the story bible (novel: premise, characters, setting,
     tone, ending), ebook plan (reader, promise, key ideas) or theme sheet. outline: a list of
     {"title", "summary"} per chapter (picture books: one per page, with "picture"). characters:
     {"Name": "one exact sentence of how they look"} (used in every picture). cover: what the front
-    cover picture shows. A changed outline needs approval again. approve=True ONLY when the user
+    cover picture shows. cover_colors: [background, accent, text] as hex, e.g. ["#101820",
+    "#f2aa4c", "#ffffff"], for the back, spine and title band of the paperback and ebook covers
+    (pick colours that suit the cover picture); [] goes back to colours picked from the title.
+    A changed outline needs approval again. approve=True ONLY when the user
     has said the outline is OK (they can also approve on the dashboard's Books tab)."""
     b = books.set_plan(title, plan, outline, characters, style, cover, dedication, author, subtitle,
-                       target_words, approve)
+                       target_words, approve, cover_colors=cover_colors)
     rows = books.chapter_rows(b)
     head = (f"Saved. Outline ({len(rows)}):\n" + "\n".join(f"{r['n']}. {r['title']} — {r['summary']}" for r in rows)
             if rows else "Saved the plan. Add the outline next.")
