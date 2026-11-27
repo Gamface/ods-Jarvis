@@ -196,6 +196,19 @@ def build(title: str, progress=lambda step, frac=None: None, formats=None) -> st
         made.append(f"KDP listing kit: {d / 'kdp' / 'listing.md'}")
         if not book.get("listing", {}).get("description"):
             notes.append("No listing yet: ask Jarvis to write it with book_listing, then build again.")
+        if cover_pic:   # print needs ~300 dpi on the front panel (trim + bleed)
+            try:
+                from ..images import image_size as _isz
+                pw, ph = _isz(Path((book.get("cover") or {}).get("image") or cover_pic))
+                dpi = min(pw / (size["trim_w"] + kdp.BLEED), ph / size["height"])
+                if dpi < 300:
+                    need_w = round((size["trim_w"] + kdp.BLEED) * 300)
+                    need_h = round(size["height"] * 300)
+                    notes.append(f"Cover picture is only {dpi:.0f} dpi in print ({pw}x{ph}; KDP wants 300, i.e. at least "
+                                 f"{need_w}x{need_h}). Upscale it with studio_upscale_image, set the result with "
+                                 f"book_plan(cover_image=...), then build again.")
+            except Exception:
+                pass
     if ebook_cover:
         made.append(f"Ebook cover (1600x2560): {ebook_cover}")
     if "epub" in formats and book["kind"] != "puzzle":

@@ -120,7 +120,7 @@ def create(title: str, kind: str, brief: str = "", audience: str = "", author: s
 def set_plan(title: str, plan: str | None = None, outline=None, characters=None, style: str | None = None,
              cover: str | None = None, dedication: str | None = None, author: str | None = None,
              subtitle: str | None = None, target_words: int | None = None, approve: bool = False,
-             cover_colors=None) -> dict:
+             cover_colors=None, cover_image: str | None = None, cover_has_text: bool | None = None) -> dict:
     b = load(title)
     if plan is not None:
         b["plan"] = plan.strip()[:20_000]
@@ -134,6 +134,22 @@ def set_plan(title: str, plan: str | None = None, outline=None, characters=None,
         b["style"] = style.strip()[:400]
     if cover is not None:
         b.setdefault("cover", {})["picture"] = cover.strip()[:600]
+    if cover_image is not None:
+        if not cover_image.strip():
+            b.setdefault("cover", {}).pop("image", None)   # back to drawing it from cover.picture
+            b["cover"].pop("finished", None)
+        else:
+            import shutil
+            from ..images import image_size, resolve_image
+            src = resolve_image(cover_image)
+            w, h = image_size(src)
+            dest = book_dir(b["title"]) / f"cover-art{src.suffix.lower()}"
+            shutil.copy2(src, dest)                         # the book keeps its own copy
+            b.setdefault("cover", {})["image"] = str(dest)
+            b["cover"]["image_from"] = str(src)
+            b["cover"]["image_size"] = [w, h]
+    if cover_has_text is not None and (b.get("cover") or {}).get("image"):
+        b["cover"]["finished"] = bool(cover_has_text)
     if cover_colors is not None:
         colors = _clean_colors(cover_colors)
         if colors:

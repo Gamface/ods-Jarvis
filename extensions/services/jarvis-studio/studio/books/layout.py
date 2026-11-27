@@ -336,7 +336,11 @@ def cover_html(book: dict, size: dict, front_pic: Path | None) -> str:
     back_x, spine_x, front_x = 0, b + tw, b + tw + S
     head = FONTS[book["kind"]][1]
     title_font = FONTS["novel"][0] if book["kind"] in ("novel", "ebook") else head
-    pic = (f'<img src="{front_pic.as_uri()}" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">'
+    finished = bool(front_pic) and bool((book.get("cover") or {}).get("finished"))
+    if finished:   # a finished cover already carries its title and author: show it as it is
+        pic = f'<img src="{front_pic.as_uri()}" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">'
+    else:
+        pic = (f'<img src="{front_pic.as_uri()}" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">'
            f'<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 38%,rgba(0,0,0,0) 62%,rgba(0,0,0,.6) 100%)"></div>'
            if front_pic else
            f'<div style="position:absolute;left:12%;right:12%;top:46%;height:3px;background:{accent}"></div>')
@@ -364,8 +368,8 @@ body {{ margin: 0; width: {W}in; height: {H}in; position: relative; background: 
 </style></head><body>
 <div class="back">{back_text}</div>
 <div class="front" style="background:{bg}">{pic}
-<div class="ttl">{e(book["title"])}{f'<span class="sub">{e(L["subtitle"])}</span>' if L.get("subtitle") else ""}</div>
-{f'<div class="au">{e(book["author"])}</div>' if book.get("author") else ""}</div>
+{"" if finished else f'<div class="ttl">{e(book["title"])}' + (f'<span class="sub">{e(L["subtitle"])}</span>' if L.get("subtitle") else "") + '</div>'}
+{f'<div class="au">{e(book["author"])}</div>' if book.get("author") and not finished else ""}</div>
 {spine}
 <!-- barcode area (kept clear): {bw} x {bh} in at the back cover's lower right -->
 </body></html>"""
