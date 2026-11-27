@@ -162,12 +162,188 @@ def studio_make_image(prompt: str, title: str | None = None, size: str = "512x51
     """Make a picture (album cover, poster, thumbnail, concept art) on this computer with
     Stable Diffusion through Lemonade. prompt: subject, style, mood, colours, e.g.
     'album cover, snowy mountain town at dusk, warm lights, cinematic'. size: 512x512
-    (default), 768x512, 512x768 or 768x768. model: SD-Turbo (default, fast) or SDXL-Turbo
+    (default), 768x512, 512x768, 768x768; with SDXL-Turbo also 1024x576 / 576x1024 (video),
+    768x1152 (book cover, portrait) or 1024x1024. model: SD-Turbo (default, fast) or SDXL-Turbo
     if downloaded. Takes about 20 s at 512x512 (about 50 s at 768x768) on the Intel
     graphics via Vulkan. Saved to ~/Music/Jarvis/images and shown in
     the dashboard's Studio box. Waits if a song is being made."""
     from studio import images
     return images.make_image(prompt, title, size, model, seed)
+
+
+@mcp.tool()
+@guarded("image_preview")
+def studio_image_preview(paths: list[str], grid: bool = True, edit_boxes: list[list[int]] | None = None,
+                         keep_boxes: list[list[int]] | None = None,
+                         zoom_box: list[int] | None = None) -> str:
+    """LOOK at pictures. One path: a copy with a labelled pixel grid (and any edit boxes in red,
+    keep boxes in green) so you can read coordinates for studio_edit_image / studio_image_composite.
+    Several paths (up to 12): a numbered contact sheet to compare candidates. Returns an
+    /opt/data/uploads/previews/... path: open it with your vision tool and check what is really
+    there before you describe or approve a picture. Paths may be host paths under ~/Music/Jarvis,
+    ~/Studio, ~/Videos/Jarvis, or /opt/data/uploads/... zoom_box [x0,y0,x1,y1] (one path only):
+    enlarge that area with a fine grid labelled in the original picture's coordinates, to read
+    exact pixel boxes for small details and to check a box lands on them."""
+    from studio import images
+    return images.preview_images(paths, grid, edit_boxes, keep_boxes, zoom_box)
+
+
+@mcp.tool()
+@guarded("edit_image")
+def studio_edit_image(image: str, prompt: str, edit_boxes: list[list[int]],
+                      keep_boxes: list[list[int]] | None = None, feather: float = 6,
+                      model: str = "SDXL-Turbo", seed: int | None = None, title: str | None = None) -> str:
+    """Repaint parts of a picture (Lemonade masked edit). edit_boxes: [[x0,y0,x1,y1], ...] pixel
+    areas to repaint; keep_boxes: areas that must not change (the hero subject). prompt describes
+    what the repainted areas should show. Good at REMOVING things (paint them over as water, sky,
+    grass) and at evening out patchy backgrounds with one big box. Poor at ADDING a new object
+    into a small box: use studio_image_composite for that. Saves a new file (the original is
+    kept) in ~/Music/Jarvis/images. About 80 s at 1024x576."""
+    from studio import images
+    return images.edit_image(image, prompt, edit_boxes, keep_boxes, feather, model, seed, title)
+
+
+@mcp.tool()
+@guarded("image_composite")
+def studio_image_composite(base: str, source: str, source_box: list[int], at: list[int],
+                           scale: float = 1.0, feather: float = 8, key_fuzz: float = 0,
+                           match_colour: bool = True, title: str | None = None) -> str:
+    """Paste an object from one picture into another with ImageMagick: source_box [x0,y0,x1,y1]
+    around the object in `source`, `at` [x,y] = top-left where it goes in `base`, scale to resize.
+    key_fuzz (e.g. 15-30) removes the plain background around the object by flood-filling from
+    the crop's corners; match_colour shifts its colours to the target spot; feather softens edges.
+    Use when generation can't produce two different objects together (e.g. car AND speedboat).
+    Saves a new file in ~/Music/Jarvis/images."""
+    from studio import images
+    return images.composite_image(base, source, source_box, at, scale, feather, key_fuzz, match_colour, title)
+
+
+@mcp.tool()
+@guarded("image_text")
+def studio_image_text(image: str, title: str, subtitle: str | None = None, position: str = "bottom-left",
+                      title_font: str = "serif", subtitle_font: str = "sans", title_color: str = "#ffffff",
+                      subtitle_color: str = "#f3d9b1", title_size: int | None = None,
+                      name: str | None = None) -> str:
+    """Put real, sharp text on a picture with Inkscape: a title and an optional subtitle/credit
+    (e.g. 'A novel by Aldra Miller'). Image models can't spell, so ALWAYS add words this way, never
+    in the image prompt. position: bottom-left (default), bottom-center, top-left, top-center,
+    center. Fonts: serif (Noto Serif Display), sans (Inter), mono, or a font family name. Keeps an
+    editable .svg in ~/Music/Jarvis/designs (tweak it and re-render with studio_svg_render)."""
+    from studio import design
+    return design.image_text(image, title, subtitle, position, title_font, subtitle_font,
+                             title_color, subtitle_color, title_size, name)
+
+
+@mcp.tool()
+@guarded("svg_render")
+def studio_svg_render(svg: str | None = None, svg_path: str | None = None, title: str | None = None,
+                      width: int | None = None, fmt: str = "png") -> str:
+    """Render a design you write as SVG (title cards, lower thirds, posters, cover layouts, simple
+    logos) with Inkscape, or re-render an existing .svg. fmt png (to the Studio box) or pdf (for
+    print). Pictures can be placed with <image xlink:href="file:///home/gamface/..."/> from the
+    Studio folders; no web links. Fonts: 'Noto Serif Display', 'Inter', 'DejaVu Sans'. The SVG
+    source is saved in ~/Music/Jarvis/designs."""
+    from studio import design
+    return design.render_svg(svg, svg_path, title, width, fmt)
+
+
+@mcp.tool()
+@guarded("gimp_finish")
+def studio_gimp_finish(image: str, ops: list, box: list[int] | None = None,
+                       cutout_color: str | None = None, title: str | None = None) -> str:
+    """Finish a picture with GIMP filters, on the whole picture or only inside box [x0,y0,x1,y1]
+    (soft-edged). ops is a list of names or {"op": name, "amount": n}: auto_contrast, enhance,
+    warmer, cooler, exposure (stops, e.g. 0.3), saturation (e.g. 0.2 = +20%), shadows_highlights,
+    denoise, sharpen, vignette, bloom. cutout_color "#rrggbb" makes a flat background transparent
+    (handy before studio_image_composite). About 2 s. Saves a new PNG."""
+    from studio import design
+    return design.gimp_finish(image, ops, box, cutout_color, title)
+
+
+@mcp.tool()
+@guarded("layered_file")
+def studio_layered_file(base: str, layers: list | None = None, title: str | None = None,
+                        guide_boxes: list[list[int]] | None = None) -> str:
+    """Make a layered OpenRaster (.ora) file for hand finishing in Krita or GIMP: the base picture
+    plus each pasted element on its own layer. layers: [{"path": ..., "at": [x, y], "name": ...,
+    "opacity": 0-1}]. guide_boxes [[x0,y0,x1,y1], ...] adds a top "PAINT HERE" layer outlining
+    exactly where the operator should work: preview those boxes on the picture first
+    (studio_image_preview with edit_boxes) to be sure they sit on the right thing. Use the picture
+    BEFORE titles as base and add the titled version as a layer, so painting never touches the text.
+    Use when a picture needs a human touch (masking an edge, painting out a
+    detail). Then studio_open_in_app('krita', path) and, once the operator saves,
+    studio_design_export."""
+    from studio import design
+    return design.layered_file(base, layers, title, guide_boxes)
+
+
+@mcp.tool()
+@guarded("design_export")
+def studio_design_export(path: str, title: str | None = None) -> str:
+    """Flatten a design file to PNG in ~/Music/Jarvis/images: .kra/.ora/.psd with Krita, .xcf with
+    GIMP, .svg with Inkscape. Use after the operator finishes something by hand."""
+    from studio import design
+    return design.export_design(path, title)
+
+
+@mcp.tool()
+@guarded("open_in_app")
+def studio_open_in_app(app: str, path: str) -> str:
+    """Open a file in GIMP, Krita or Inkscape on the operator's desktop so they can finish it by
+    hand. app: gimp, krita or inkscape. Only when the operator asks or agrees: it opens a window
+    on their screen."""
+    from studio import design
+    return design.open_in_app(app, path)
+
+
+@mcp.tool()
+@guarded("find_files")
+def studio_find_files(query: str = "", where: str = "studio", kind: str = "any", limit: int = 30) -> str:
+    """FIND files on this computer by name, newest first. Your own search_files/read_file only see
+    /opt/data inside your container: the Studio folders (~/Music/Jarvis, ~/Videos/Jarvis, ~/Studio,
+    ~/Documents/Jarvis), Downloads, Desktop and Pictures are on the host, so search them HERE.
+    where: studio (default), downloads, desktop, pictures, uploads or all. kind: any, image,
+    design, audio, video, book. query: words that must all appear in the path, e.g. "gemini cover".
+    Pass the host paths it returns straight to the Studio and book tools."""
+    from studio import design
+    return design.find_files(query, where, kind, limit)
+
+
+@mcp.tool()
+@guarded("import_file")
+def studio_import_file(path: str, name: str | None = None) -> str:
+    """Bring a file the operator downloaded or uploaded into the Studio, so the other tools can
+    use it: from ~/Downloads, ~/Desktop, ~/Pictures, ~/Documents or a dashboard upload
+    (/opt/data/uploads/...). Pictures go to ~/Music/Jarvis/images, design files (.svg .pdf .ora
+    .kra .psd .xcf) to ~/Music/Jarvis/designs, audio/video to ~/Music/Jarvis/imports. Copies;
+    the original is untouched. Use it whenever a tool says a path is outside the Studio folders."""
+    from studio import design
+    return design.import_file(path, name)
+
+
+@mcp.tool()
+@guarded("convert_file")
+def studio_convert_file(path: str, to: str, title: str | None = None) -> str:
+    """Convert a picture or design file to another format, picking the right program: Krita for
+    .kra/.psd/.ora (keeps layers), GIMP for .xcf, Inkscape for .svg/.pdf (vector), ImageMagick for
+    png/jpg/webp/tiff. Reads png, jpg, webp, tiff, gif, svg, pdf (first page), ora, kra, psd, xcf.
+    to: png, jpg, webp, tiff, pdf, svg, ora, kra, psd or xcf. E.g. a picture to .kra so the
+    operator can paint on it in Krita, a cover to print PDF, a Krita file back to PNG. Saves a new
+    file (pictures in ~/Music/Jarvis/images, design files in ~/Music/Jarvis/designs)."""
+    from studio import design
+    return design.convert_file(path, to, title)
+
+
+@mcp.tool()
+@guarded("upscale_image")
+def studio_upscale_image(image: str, model: str = "RealESRGAN-x4plus", title: str | None = None) -> str:
+    """Make a picture 4x larger and sharper with Real-ESRGAN (Lemonade), e.g. 896x1200 ->
+    3584x4800. Use it before PRINT: a paperback cover needs about 300 dpi (5.5x8.5 in needs at
+    least 1725x2625 px), and book_build warns when a cover is below that. model:
+    RealESRGAN-x4plus (photos, realistic art) or RealESRGAN-x4plus-anime (drawn/cartoon art).
+    Takes from seconds to a few minutes; saves a new PNG in ~/Music/Jarvis/images."""
+    from studio import images
+    return images.upscale_image(image, model, title)
 
 
 @mcp.tool()
@@ -445,7 +621,8 @@ def book_plan(title: str, plan: str | None = None, outline: list | str | None = 
               characters: dict | str | None = None, style: str | None = None, cover: str | None = None,
               dedication: str | None = None, author: str | None = None, subtitle: str | None = None,
               target_words: int | None = None, approve: bool = False,
-              cover_colors: list | str | None = None) -> str:
+              cover_colors: list | str | None = None, cover_image: str | None = None,
+              cover_has_text: bool | None = None) -> str:
     """Save the book's plan and outline. plan: the story bible (novel: premise, characters, setting,
     tone, ending), ebook plan (reader, promise, key ideas) or theme sheet. outline: a list of
     {"title", "summary"} per chapter (picture books: one per page, with "picture"). characters:
@@ -453,10 +630,20 @@ def book_plan(title: str, plan: str | None = None, outline: list | str | None = 
     cover picture shows. cover_colors: [background, accent, text] as hex, e.g. ["#101820",
     "#f2aa4c", "#ffffff"], for the back, spine and title band of the paperback and ebook covers
     (pick colours that suit the cover picture); [] goes back to colours picked from the title.
+    cover_image: a FINISHED picture to use as the front cover instead of drawing one (from
+    ~/Music/Jarvis/images, a Krita export, a dashboard upload); "" goes back to drawing it.
+    Artwork without text: the build adds title and author. A FINISHED cover that already shows
+    the title and author: also pass cover_has_text=True and the front is used exactly as it is
+    (back and spine still come from the book). Either way it must be PORTRAIT (about 5:8, e.g.
+    768x1152 or larger): the front is cropped from the centre, so a wide picture loses its sides.
+    The path is a HOST path (~/Music/Jarvis/..., ~/Downloads files after studio_import_file):
+    the Studio reads it directly even though your own file tools can't see those folders.
+    Then run book_build to remake the covers.
     A changed outline needs approval again. approve=True ONLY when the user
     has said the outline is OK (they can also approve on the dashboard's Books tab)."""
     b = books.set_plan(title, plan, outline, characters, style, cover, dedication, author, subtitle,
-                       target_words, approve, cover_colors=cover_colors)
+                       target_words, approve, cover_colors=cover_colors, cover_image=cover_image,
+                       cover_has_text=cover_has_text)
     rows = books.chapter_rows(b)
     head = (f"Saved. Outline ({len(rows)}):\n" + "\n".join(f"{r['n']}. {r['title']} — {r['summary']}" for r in rows)
             if rows else "Saved the plan. Add the outline next.")
